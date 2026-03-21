@@ -1,0 +1,211 @@
+[
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-03-16",
+    "stock_name": "首航新能",
+    "stock_code": "301658",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 52.54,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-03-13",
+    "stock_name": "北方国际",
+    "stock_code": "000065",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 14.31,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-03-12",
+    "stock_name": "航天电器",
+    "stock_code": "002025",
+    "trades": 4,
+    "position_ratio": "9成以上",
+    "position_value": 58.812,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-03-06",
+    "stock_name": "富祥药业",
+    "stock_code": "300497",
+    "trades": 2,
+    "position_ratio": "9成以上",
+    "position_value": 15.33,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-03-03",
+    "stock_name": "中钢国际",
+    "stock_code": "000928",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 7.14,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-01-14",
+    "stock_name": "昊志机电",
+    "stock_code": "300503",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 61.13,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-01-09",
+    "stock_name": "安泰科技",
+    "stock_code": "000969",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 25.179,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2026-01-08",
+    "stock_name": "信维通信",
+    "stock_code": "300136",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 75.0,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-29",
+    "stock_name": "信维通信",
+    "stock_code": "300136",
+    "trades": 3,
+    "position_ratio": "9成以上",
+    "position_value": 51.857,
+    "direction": "持有",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-24",
+    "stock_name": "航天发展",
+    "stock_code": "000547",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 24.28,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-23",
+    "stock_name": "雪人集团",
+    "stock_code": "002639",
+    "trades": 2,
+    "position_ratio": "6成",
+    "position_value": 19.062,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-15",
+    "stock_name": "北方国际",
+    "stock_code": "000065",
+    "trades": 1,
+    "position_ratio": "5成",
+    "position_value": 12.674,
+    "direction": "卖出",
+    "position_change": -45
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-12",
+    "stock_name": "超捷股份",
+    "stock_code": "301005",
+    "trades": 1,
+    "position_ratio": "5成",
+    "position_value": 96.28,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-08",
+    "stock_name": "超捷股份",
+    "stock_code": "301005",
+    "trades": 1,
+    "position_ratio": "4成",
+    "position_value": 76.28,
+    "direction": "卖出",
+    "position_change": -10
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-12-01",
+    "stock_name": "超捷股份",
+    "stock_code": "301005",
+    "trades": 2,
+    "position_ratio": "9成以上",
+    "position_value": 62.945,
+    "direction": "买入",
+    "position_change": 55
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-11-28",
+    "stock_name": "超捷股份",
+    "stock_code": "301005",
+    "trades": 5,
+    "position_ratio": "9成以上",
+    "position_value": 67.385,
+    "direction": "持有",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-11-17",
+    "stock_name": "上海沪工",
+    "stock_code": "603131",
+    "trades": 1,
+    "position_ratio": "2成",
+    "position_value": 28.8,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-11-14",
+    "stock_name": "上海沪工",
+    "stock_code": "603131",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 28.25,
+    "direction": "买入",
+    "position_change": 75
+  },
+  {
+    "zh_id": "900313389",
+    "trade_date": "2025-11-13",
+    "stock_name": "安泰科技",
+    "stock_code": "000969",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 20.02,
+    "direction": "持有",
+    "position_change": 0
+  }
+]

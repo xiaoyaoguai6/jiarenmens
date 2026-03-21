@@ -1,0 +1,145 @@
+[
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-03-20",
+    "stock_name": "雅博股份",
+    "stock_code": "002323",
+    "trades": 1,
+    "position_ratio": "8成",
+    "position_value": 2.82,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-02-27",
+    "stock_name": "华电辽能",
+    "stock_code": "600396",
+    "trades": 1,
+    "position_ratio": "8成",
+    "position_value": 3.37,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-01-29",
+    "stock_name": "黄金ETF",
+    "stock_code": "518880",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 11.857,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-01-28",
+    "stock_name": "黄金ETF",
+    "stock_code": "518880",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 11.206,
+    "direction": "持有",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-01-26",
+    "stock_name": "首开股份",
+    "stock_code": "600376",
+    "trades": 1,
+    "position_ratio": "8成",
+    "position_value": 5.58,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-01-15",
+    "stock_name": "连云港",
+    "stock_code": "601008",
+    "trades": 1,
+    "position_ratio": "8成",
+    "position_value": 5.27,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2026-01-13",
+    "stock_name": "大众交通",
+    "stock_code": "600611",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 5.91,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-12-05",
+    "stock_name": "大众交通",
+    "stock_code": "600611",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 5.81,
+    "direction": "持有",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-12-03",
+    "stock_name": "KC半导体",
+    "stock_code": "589020",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 1.11,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-11-28",
+    "stock_name": "KC半导体",
+    "stock_code": "589020",
+    "trades": 1,
+    "position_ratio": "7成",
+    "position_value": 1.115,
+    "direction": "卖出",
+    "position_change": -25
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-11-27",
+    "stock_name": "科创东财",
+    "stock_code": "589850",
+    "trades": 1,
+    "position_ratio": "7成",
+    "position_value": 1.268,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-11-26",
+    "stock_name": "芯片指数",
+    "stock_code": "159599",
+    "trades": 1,
+    "position_ratio": "2成",
+    "position_value": 1.937,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900327937",
+    "trade_date": "2025-11-25",
+    "stock_name": "芯片指数",
+    "stock_code": "159599",
+    "trades": 1,
+    "position_ratio": "4成",
+    "position_value": 1.911,
+    "direction": "买入",
+    "position_change": 20
+  }
+]

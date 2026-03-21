@@ -1,0 +1,178 @@
+[
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-20",
+    "stock_name": "美利云",
+    "stock_code": "000815",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 20.19,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-17",
+    "stock_name": "华电辽能",
+    "stock_code": "600396",
+    "trades": 2,
+    "position_ratio": "9成以上",
+    "position_value": 4.359,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-16",
+    "stock_name": "华电能源",
+    "stock_code": "600726",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 4.29,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-13",
+    "stock_name": "华电能源",
+    "stock_code": "600726",
+    "trades": 3,
+    "position_ratio": "9成以上",
+    "position_value": 4.046,
+    "direction": "买入",
+    "position_change": 65
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-12",
+    "stock_name": "瑞斯康达",
+    "stock_code": "603803",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 12.81,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-11",
+    "stock_name": "顺钠股份",
+    "stock_code": "000533",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 17.8,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-10",
+    "stock_name": "顺钠股份",
+    "stock_code": "000533",
+    "trades": 1,
+    "position_ratio": "8成",
+    "position_value": 17.37,
+    "direction": "卖出",
+    "position_change": -15
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-09",
+    "stock_name": "百川股份",
+    "stock_code": "002455",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 13.0,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-03-06",
+    "stock_name": "百川股份",
+    "stock_code": "002455",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 13.18,
+    "direction": "持有",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-25",
+    "stock_name": "金富科技",
+    "stock_code": "003018",
+    "trades": 1,
+    "position_ratio": "6成",
+    "position_value": 23.64,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-12",
+    "stock_name": "金富科技",
+    "stock_code": "003018",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 22.36,
+    "direction": "卖出",
+    "position_change": -30
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-11",
+    "stock_name": "小崧股份",
+    "stock_code": "002723",
+    "trades": 3,
+    "position_ratio": "3成",
+    "position_value": 10.955,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-10",
+    "stock_name": "韩建河山",
+    "stock_code": "603616",
+    "trades": 1,
+    "position_ratio": "1成",
+    "position_value": 8.71,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-09",
+    "stock_name": "韩建河山",
+    "stock_code": "603616",
+    "trades": 4,
+    "position_ratio": "7成",
+    "position_value": 8.622,
+    "direction": "买入",
+    "position_change": 60
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-06",
+    "stock_name": "杭电股份",
+    "stock_code": "603618",
+    "trades": 1,
+    "position_ratio": "1成",
+    "position_value": 13.71,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900377477",
+    "trade_date": "2026-02-05",
+    "stock_name": "杭电股份",
+    "stock_code": "603618",
+    "trades": 1,
+    "position_ratio": "1成",
+    "position_value": 12.46,
+    "direction": "持有",
+    "position_change": 0
+  }
+]

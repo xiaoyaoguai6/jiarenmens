@@ -1,0 +1,112 @@
+[
+  {
+    "zh_id": "900288003",
+    "trade_date": "2026-03-03",
+    "stock_name": "首航新能",
+    "stock_code": "301658",
+    "trades": 1,
+    "position_ratio": "9成以上",
+    "position_value": 36.19,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2026-01-07",
+    "stock_name": "华夏幸福",
+    "stock_code": "600340",
+    "trades": 1,
+    "position_ratio": "1成以下",
+    "position_value": 2.31,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-31",
+    "stock_name": "星源材质",
+    "stock_code": "300568",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 14.44,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-29",
+    "stock_name": "赛腾股份",
+    "stock_code": "603283",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 47.29,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-24",
+    "stock_name": "赛腾股份",
+    "stock_code": "603283",
+    "trades": 1,
+    "position_ratio": "2成",
+    "position_value": 45.91,
+    "direction": "卖出",
+    "position_change": -10
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-22",
+    "stock_name": "山河智能",
+    "stock_code": "002097",
+    "trades": 1,
+    "position_ratio": "4成",
+    "position_value": 15.1,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-21",
+    "stock_name": "汇金股份",
+    "stock_code": "300368",
+    "trades": 1,
+    "position_ratio": "4成",
+    "position_value": 19.02,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-17",
+    "stock_name": "三川智慧",
+    "stock_code": "300066",
+    "trades": 1,
+    "position_ratio": "1成以下",
+    "position_value": 7.27,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-14",
+    "stock_name": "新莱应材",
+    "stock_code": "300260",
+    "trades": 1,
+    "position_ratio": "4成",
+    "position_value": 74.16,
+    "direction": "调仓",
+    "position_change": 0
+  },
+  {
+    "zh_id": "900288003",
+    "trade_date": "2025-10-13",
+    "stock_name": "哈焊华通",
+    "stock_code": "301137",
+    "trades": 1,
+    "position_ratio": "3成",
+    "position_value": 55.35,
+    "direction": "调仓",
+    "position_change": 0
+  }
+]

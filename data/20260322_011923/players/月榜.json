@@ -1,0 +1,104 @@
+[
+  {
+    "zh_id": "900300830",
+    "name": "哈基瑟",
+    "user_id": "2178186867154620",
+    "followers": 94,
+    "labels": [
+      "燃气Ⅲ",
+      "能源及重型设备"
+    ],
+    "daily_return": 93.84
+  },
+  {
+    "zh_id": "900314259",
+    "name": "实盘组合00314259",
+    "user_id": "8536095140253058",
+    "followers": 310,
+    "labels": [
+      "通信"
+    ],
+    "daily_return": 82.61
+  },
+  {
+    "zh_id": "900241257",
+    "name": "走",
+    "user_id": "2177156983022318",
+    "followers": 63,
+    "labels": [
+      "风力发电"
+    ],
+    "daily_return": 81.96
+  },
+  {
+    "zh_id": "900294166",
+    "name": "小林爱保本",
+    "user_id": "2154346206529372",
+    "followers": 57,
+    "labels": [
+      "文娱用品"
+    ],
+    "daily_return": 81.33
+  },
+  {
+    "zh_id": "900122249",
+    "name": "魏伊阳",
+    "user_id": "5447112039478780",
+    "followers": 42,
+    "labels": [
+      "国防军工"
+    ],
+    "daily_return": 81.06
+  },
+  {
+    "zh_id": "900377477",
+    "name": "开派祖师hz",
+    "user_id": "9899037338997004",
+    "followers": 128,
+    "labels": [
+      "火力发电",
+      "IT服务Ⅲ"
+    ],
+    "daily_return": 75.17
+  },
+  {
+    "zh_id": "900058281",
+    "name": "芯片强国",
+    "user_id": "5335094207831806",
+    "followers": 738,
+    "labels": [
+      "基础化工"
+    ],
+    "daily_return": 74.95
+  },
+  {
+    "zh_id": "900115133",
+    "name": "宁波桑田路团队",
+    "user_id": "7233375729949904",
+    "followers": 12,
+    "labels": [
+      "光伏电池组件"
+    ],
+    "daily_return": 74.57
+  },
+  {
+    "zh_id": "900294312",
+    "name": "开元路",
+    "user_id": "4377376459754024",
+    "followers": 14,
+    "labels": [
+      "光伏电池组件"
+    ],
+    "daily_return": 74.36
+  },
+  {
+    "zh_id": "900343272",
+    "name": "小散也有复利的心",
+    "user_id": "3496077612003316",
+    "followers": 64,
+    "labels": [
+      "光伏电池组件"
+    ],
+    "daily_return": 73.79
+  }
+]

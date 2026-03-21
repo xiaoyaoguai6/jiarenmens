@@ -1,0 +1,422 @@
+[
+  {
+    "zh_id": "900001172",
+    "stock_name": "欣天科技",
+    "stock_code": "300615",
+    "cost_price": 15.098,
+    "current_price": 14.66,
+    "profit_ratio": -2.9,
+    "position_ratio": 90.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "天邑股份",
+    "stock_code": "300504",
+    "cost_price": 18.293,
+    "current_price": 15.7,
+    "profit_ratio": -14.18,
+    "position_ratio": 1.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "光迅科技",
+    "stock_code": "002281",
+    "cost_price": 485.58,
+    "current_price": 83.08,
+    "profit_ratio": -82.89,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "南方航空",
+    "stock_code": "600029",
+    "cost_price": 10.077,
+    "current_price": 5.77,
+    "profit_ratio": -42.74,
+    "position_ratio": 2.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "清源股份",
+    "stock_code": "603628",
+    "cost_price": 0.657,
+    "current_price": 15.31,
+    "profit_ratio": 2229.78,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "杰瑞股份",
+    "stock_code": "002353",
+    "cost_price": 51.964,
+    "current_price": 96.16,
+    "profit_ratio": 85.05,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "*ST新元",
+    "stock_code": "300472",
+    "cost_price": 8.385,
+    "current_price": 8.37,
+    "profit_ratio": -0.18,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "派瑞股份",
+    "stock_code": "300831",
+    "cost_price": 78.132,
+    "current_price": 16.95,
+    "profit_ratio": -78.31,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "钜泉科技",
+    "stock_code": "688391",
+    "cost_price": 321.738,
+    "current_price": 31.0,
+    "profit_ratio": -90.36,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "北京君正",
+    "stock_code": "300223",
+    "cost_price": 837.057,
+    "current_price": 119.8,
+    "profit_ratio": -85.69,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "有研新材",
+    "stock_code": "600206",
+    "cost_price": 360.513,
+    "current_price": 20.64,
+    "profit_ratio": -94.27,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "山东黄金",
+    "stock_code": "600547",
+    "cost_price": 89.147,
+    "current_price": 39.69,
+    "profit_ratio": -55.48,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "博威合金",
+    "stock_code": "601137",
+    "cost_price": 82.7,
+    "current_price": 18.92,
+    "profit_ratio": -77.12,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "上海莱士",
+    "stock_code": "002252",
+    "cost_price": 147.058,
+    "current_price": 6.02,
+    "profit_ratio": -95.91,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "中源协和",
+    "stock_code": "600645",
+    "cost_price": 80.374,
+    "current_price": 29.98,
+    "profit_ratio": -62.7,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "海星股份",
+    "stock_code": "603115",
+    "cost_price": 269.605,
+    "current_price": 31.85,
+    "profit_ratio": -88.19,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "双象股份",
+    "stock_code": "002395",
+    "cost_price": 128.518,
+    "current_price": 17.68,
+    "profit_ratio": -86.24,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "华胜天成",
+    "stock_code": "600410",
+    "cost_price": 143.83,
+    "current_price": 25.18,
+    "profit_ratio": -82.49,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "荣联科技",
+    "stock_code": "002642",
+    "cost_price": 252.721,
+    "current_price": 7.79,
+    "profit_ratio": -96.92,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "岩山科技",
+    "stock_code": "002195",
+    "cost_price": 2949.396,
+    "current_price": 9.35,
+    "profit_ratio": -99.68,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "天山铝业",
+    "stock_code": "002532",
+    "cost_price": 63.909,
+    "current_price": 15.41,
+    "profit_ratio": -75.89,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "众泰汽车",
+    "stock_code": "000980",
+    "cost_price": 50.304,
+    "current_price": 2.49,
+    "profit_ratio": -95.05,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "柘中股份",
+    "stock_code": "002346",
+    "cost_price": 507.433,
+    "current_price": 18.91,
+    "profit_ratio": -96.27,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "太阳电缆",
+    "stock_code": "002300",
+    "cost_price": 3886.708,
+    "current_price": 9.49,
+    "profit_ratio": -99.76,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "粤万年青",
+    "stock_code": "301111",
+    "cost_price": 28.243,
+    "current_price": 18.82,
+    "profit_ratio": -33.36,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "天士力",
+    "stock_code": "600535",
+    "cost_price": 100.644,
+    "current_price": 14.15,
+    "profit_ratio": -85.94,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "太龙药业",
+    "stock_code": "600222",
+    "cost_price": 34.332,
+    "current_price": 7.06,
+    "profit_ratio": -79.44,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "兴业银行",
+    "stock_code": "601166",
+    "cost_price": 201.184,
+    "current_price": 18.79,
+    "profit_ratio": -90.66,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "城发环境",
+    "stock_code": "000885",
+    "cost_price": 97.53,
+    "current_price": 13.71,
+    "profit_ratio": -85.94,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "创业环保",
+    "stock_code": "600874",
+    "cost_price": 144.659,
+    "current_price": 6.28,
+    "profit_ratio": -95.66,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "联泰环保",
+    "stock_code": "603797",
+    "cost_price": 108.086,
+    "current_price": 4.64,
+    "profit_ratio": -95.71,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "宝鼎科技",
+    "stock_code": "002552",
+    "cost_price": 44.712,
+    "current_price": 16.99,
+    "profit_ratio": -62.0,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "聚光科技",
+    "stock_code": "300203",
+    "cost_price": 55.291,
+    "current_price": 13.61,
+    "profit_ratio": -75.38,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "飞天诚信",
+    "stock_code": "300386",
+    "cost_price": 112.261,
+    "current_price": 14.84,
+    "profit_ratio": -86.78,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "莱宝高科",
+    "stock_code": "002106",
+    "cost_price": 304.07,
+    "current_price": 11.5,
+    "profit_ratio": -96.22,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "五矿发展",
+    "stock_code": "600058",
+    "cost_price": 188.901,
+    "current_price": 11.3,
+    "profit_ratio": -94.02,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "凤凰传媒",
+    "stock_code": "601928",
+    "cost_price": 182.24,
+    "current_price": 9.78,
+    "profit_ratio": -94.63,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "仙坛股份",
+    "stock_code": "002746",
+    "cost_price": 48.528,
+    "current_price": 6.12,
+    "profit_ratio": -87.39,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "*ST交投",
+    "stock_code": "002200",
+    "cost_price": 55.053,
+    "current_price": 7.38,
+    "profit_ratio": -86.59,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "华西股份",
+    "stock_code": "000936",
+    "cost_price": 29.627,
+    "current_price": 7.35,
+    "profit_ratio": -75.19,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "华菱钢铁",
+    "stock_code": "000932",
+    "cost_price": 17.386,
+    "current_price": 5.24,
+    "profit_ratio": -69.86,
+    "position_ratio": 0.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900001172",
+    "stock_name": "本钢板材",
+    "stock_code": "000761",
+    "cost_price": 109.928,
+    "current_price": 3.25,
+    "profit_ratio": -97.04,
+    "position_ratio": 0.0,
+    "update_time": ""
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "zh_id": "900316711",
+    "stock_name": "华电辽能",
+    "stock_code": "600396",
+    "cost_price": 1.583,
+    "current_price": 6.26,
+    "profit_ratio": 295.41,
+    "position_ratio": 42.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900316711",
+    "stock_name": "华电能源",
+    "stock_code": "600726",
+    "cost_price": 5.242,
+    "current_price": 5.52,
+    "profit_ratio": 5.31,
+    "position_ratio": 12.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900316711",
+    "stock_name": "中国能建",
+    "stock_code": "601868",
+    "cost_price": 3.422,
+    "current_price": 3.17,
+    "profit_ratio": -7.36,
+    "position_ratio": 4.0,
+    "update_time": ""
+  }
+]

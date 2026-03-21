@@ -1,0 +1,22 @@
+[
+  {
+    "zh_id": "900288003",
+    "stock_name": "首航新能",
+    "stock_code": "301658",
+    "cost_price": 36.24,
+    "current_price": 60.35,
+    "profit_ratio": 66.53,
+    "position_ratio": 95.0,
+    "update_time": ""
+  },
+  {
+    "zh_id": "900288003",
+    "stock_name": "华夏幸福",
+    "stock_code": "600340",
+    "cost_price": 2.335,
+    "current_price": 1.46,
+    "profit_ratio": -37.47,
+    "position_ratio": 5.0,
+    "update_time": ""
+  }
+]

@@ -84,6 +84,7 @@ class SQLiteStorage(StorageInterface):
                     profit_ratio REAL DEFAULT 0.0,
                     position_ratio REAL DEFAULT 0.0,
                     update_time TEXT DEFAULT '',
+                    crawl_date TEXT DEFAULT '',
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (zh_id) REFERENCES players(zh_id) ON DELETE CASCADE
                 )
@@ -102,6 +103,7 @@ class SQLiteStorage(StorageInterface):
                     trade_date TEXT DEFAULT '',
                     direction TEXT DEFAULT '',
                     position_change REAL DEFAULT 0.0,
+                    crawl_date TEXT DEFAULT '',
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (zh_id) REFERENCES players(zh_id) ON DELETE CASCADE
                 )
@@ -110,9 +112,11 @@ class SQLiteStorage(StorageInterface):
             # 索引
             conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_zh_id ON positions(zh_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_stock ON positions(stock_code)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_crawl_date ON positions(crawl_date)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_zh_id ON trades(zh_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_stock ON trades(stock_code)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_crawl_date ON trades(crawl_date)")
 
             conn.commit()
 
@@ -226,26 +230,30 @@ class SQLiteStorage(StorageInterface):
                 for p in players
             ])
 
-    def save_positions_batch(self, data: List[tuple]) -> None:
+    def save_positions_batch(self, data: List[tuple], crawl_date: str = None) -> None:
         """
-        批量保存持仓（高性能）
+        批量保存持仓（按日期去重，同一天只保留最新一次）
 
         Args:
             data: List of (zh_id, positions_list) tuples
+            crawl_date: 爬取日期，格式如 '2026-03-24'
         """
         if not data:
             return
+        if crawl_date is None:
+            from datetime import date
+            crawl_date = date.today().isoformat()
         with self.get_connection() as conn:
             for zh_id, positions in data:
-                # 删除旧数据
-                conn.execute("DELETE FROM positions WHERE zh_id=?", (zh_id,))
+                # 删除该选手该日期的旧数据
+                conn.execute("DELETE FROM positions WHERE zh_id=? AND crawl_date=?", (zh_id, crawl_date))
                 # 批量插入新数据
                 if positions:
                     conn.executemany("""
                         INSERT INTO positions (
                             zh_id, stock_name, stock_code, cost_price, current_price,
-                            profit_ratio, position_ratio, update_time, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            profit_ratio, position_ratio, update_time, crawl_date, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, [
                         (
                             zh_id,
@@ -256,30 +264,35 @@ class SQLiteStorage(StorageInterface):
                             pos.get('profit_ratio', 0.0),
                             pos.get('position_ratio', 0.0),
                             pos.get('update_time', ''),
+                            crawl_date,
                         )
                         for pos in positions
                     ])
 
-    def save_trades_batch(self, data: List[tuple]) -> None:
+    def save_trades_batch(self, data: List[tuple], crawl_date: str = None) -> None:
         """
-        批量保存调仓记录（高性能）
+        批量保存调仓记录（按日期去重，同一天只保留最新一次）
 
         Args:
             data: List of (zh_id, trades_list) tuples
+            crawl_date: 爬取日期，格式如 '2026-03-24'
         """
         if not data:
             return
+        if crawl_date is None:
+            from datetime import date
+            crawl_date = date.today().isoformat()
         with self.get_connection() as conn:
             for zh_id, trades in data:
-                # 删除旧数据
-                conn.execute("DELETE FROM trades WHERE zh_id=?", (zh_id,))
+                # 删除该选手该日期的旧数据
+                conn.execute("DELETE FROM trades WHERE zh_id=? AND crawl_date=?", (zh_id, crawl_date))
                 # 批量插入新数据
                 if trades:
                     conn.executemany("""
                         INSERT INTO trades (
                             zh_id, stock_name, stock_code, trades_count, position_ratio,
-                            position_value, trade_date, direction, position_change, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            position_value, trade_date, direction, position_change, crawl_date, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """, [
                         (
                             zh_id,
@@ -291,6 +304,7 @@ class SQLiteStorage(StorageInterface):
                             trade.get('trade_date', ''),
                             trade.get('direction', ''),
                             trade.get('position_change', 0.0),
+                            crawl_date,
                         )
                         for trade in trades
                     ])
@@ -401,8 +415,41 @@ class SQLiteStorage(StorageInterface):
 
     # ---- 分析查询 ----
 
-    def get_top_holdings(self, top_n: int = 20) -> List[Dict[str, Any]]:
+    def get_positions_by_date(self, crawl_date: str = None) -> List[Dict[str, Any]]:
+        """获取指定日期的持仓数据"""
+        if crawl_date is None:
+            from datetime import date
+            crawl_date = date.today().isoformat()
+        with self.get_connection() as conn:
+            rows = conn.execute("""
+                SELECT p.*, pl.name as player_name
+                FROM positions p
+                LEFT JOIN players pl ON p.zh_id = pl.zh_id
+                WHERE p.crawl_date = ?
+                ORDER BY p.position_ratio DESC
+            """, (crawl_date,)).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_trades_by_date(self, crawl_date: str = None) -> List[Dict[str, Any]]:
+        """获取指定日期的调仓数据"""
+        if crawl_date is None:
+            from datetime import date
+            crawl_date = date.today().isoformat()
+        with self.get_connection() as conn:
+            rows = conn.execute("""
+                SELECT t.*, pl.name as player_name
+                FROM trades t
+                LEFT JOIN players pl ON t.zh_id = pl.zh_id
+                WHERE t.crawl_date = ?
+                ORDER BY t.trade_date DESC
+            """, (crawl_date,)).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_top_holdings(self, top_n: int = 20, crawl_date: str = None) -> List[Dict[str, Any]]:
         """获取持仓最多的股票"""
+        if crawl_date is None:
+            from datetime import date
+            crawl_date = date.today().isoformat()
         with self.get_connection() as conn:
             rows = conn.execute("""
                 SELECT
@@ -412,11 +459,11 @@ class SQLiteStorage(StorageInterface):
                     AVG(position_ratio) as avg_position_ratio,
                     AVG(profit_ratio) as avg_profit_ratio
                 FROM positions
-                WHERE stock_code IS NOT NULL AND stock_code != ''
+                WHERE stock_code IS NOT NULL AND stock_code != '' AND crawl_date = ?
                 GROUP BY stock_code
                 ORDER BY holder_count DESC
                 LIMIT ?
-            """, (top_n,)).fetchall()
+            """, (crawl_date, top_n)).fetchall()
 
             return [dict(row) for row in rows]
 

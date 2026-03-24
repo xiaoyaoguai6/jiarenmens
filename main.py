@@ -140,7 +140,12 @@ async def crawl_all_data_async(
     completed_ids = set(checkpoint.get('completed_ids', []))
     start_time = checkpoint.get('start_time') or time.time()
 
+    # 本次爬取日期
+    from datetime import date
+    crawl_date = date.today().isoformat()
+
     logger.info(f"检查点: 已完成 {len(completed_ids)} 个选手")
+    logger.info(f"本次爬取日期: {crawl_date}")
 
     # 创建连接池
     pool = AsyncPlaywrightPool(pool_size=max_workers)
@@ -161,7 +166,7 @@ async def crawl_all_data_async(
             logger.info("收到中断信号，正在保存检查点和数据...")
             interrupted = True
             # 保存剩余数据
-            _flush_batch(storage, pending_players, pending_positions, pending_trades)
+            _flush_batch(storage, pending_players, pending_positions, pending_trades, crawl_date)
             checkpoint['completed_ids'] = list(completed_ids)
             checkpoint['start_time'] = start_time
             save_checkpoint(checkpoint)
@@ -192,16 +197,16 @@ async def crawl_all_data_async(
 
                 return await crawl_player_data_async(zh_id, name, pool, skip_existing)
 
-        def _flush_batch(storage, players_buf, positions_buf, trades_buf):
+        def _flush_batch(storage, players_buf, positions_buf, trades_buf, crawl_date):
             """批量保存数据"""
             if players_buf:
                 storage.save_players_batch(players_buf)
                 logger.debug(f"批量保存 {len(players_buf)} 个选手")
             if positions_buf:
-                storage.save_positions_batch(positions_buf)
+                storage.save_positions_batch(positions_buf, crawl_date)
                 logger.debug(f"批量保存 {len(positions_buf)} 条持仓记录")
             if trades_buf:
-                storage.save_trades_batch(trades_buf)
+                storage.save_trades_batch(trades_buf, crawl_date)
                 logger.debug(f"批量保存 {len(trades_buf)} 条调仓记录")
 
         # 创建所有任务
@@ -228,7 +233,7 @@ async def crawl_all_data_async(
 
                 # 批量保存
                 if len(pending_players) >= BATCH_SIZE:
-                    _flush_batch(storage, pending_players, pending_positions, pending_trades)
+                    _flush_batch(storage, pending_players, pending_positions, pending_trades, crawl_date)
                     pending_players.clear()
                     pending_positions.clear()
                     pending_trades.clear()
@@ -241,7 +246,7 @@ async def crawl_all_data_async(
 
             # 保存检查点
             if i % checkpoint_interval == 0:
-                _flush_batch(storage, pending_players, pending_positions, pending_trades)
+                _flush_batch(storage, pending_players, pending_positions, pending_trades, crawl_date)
                 pending_players.clear()
                 pending_positions.clear()
                 pending_trades.clear()
@@ -255,7 +260,7 @@ async def crawl_all_data_async(
                 break
 
         # 最终批量保存
-        _flush_batch(storage, pending_players, pending_positions, pending_trades)
+        _flush_batch(storage, pending_players, pending_positions, pending_trades, crawl_date)
 
         # 最终检查点
         checkpoint['completed_ids'] = list(completed_ids)

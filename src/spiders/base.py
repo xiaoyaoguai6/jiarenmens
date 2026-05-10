@@ -70,9 +70,7 @@ class AsyncBaseSpider:
                 async with self.pool.get_context(timeout) as ctx:
                     page = await ctx.new_page()
                     try:
-                        await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
-                        # 等待页面主要内容加载
-                        await page.wait_for_timeout(3000)
+                        await page.goto(url, wait_until='networkidle', timeout=timeout * 1000)
                         return await page.content()
                     finally:
                         await page.close()
@@ -103,10 +101,7 @@ class AsyncBaseSpider:
                 async with self.pool.get_context(timeout) as ctx:
                     page = await ctx.new_page()
                     try:
-                        await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
-
-                        # 等待初始内容加载
-                        await page.wait_for_timeout(3000)
+                        await page.goto(url, wait_until='networkidle', timeout=timeout * 1000)
 
                         # 滚动加载
                         for _ in range(max_scrolls):

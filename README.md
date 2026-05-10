@@ -5,15 +5,33 @@
 ## 功能特性
 
 - **异步并发爬取** - 使用 asyncio + Playwright，单选手内三类数据真正并行
-- **浏览器连接池** - 浏览器实例复用，避免频繁创建/销毁开销
-- **SQLite 高效存储** - 支持 SQL 查询分析，批量写入优化
+- **浏览器连接池** - 浏览器实例复用，Context 池化管理，避免频繁创建/销毁开销
+- **反检测机制** - 自定义 UserAgent、viewport、locale、时区，绕过网站反爬限制
+- **SQLite 高效存储** - 日期隔离存储，支持按日期分析查询，批量写入优化
 - **断点续传** - Ctrl+C 中断后可继续，自动保存检查点
+- **跨平台兼容** - 支持 Windows 和 Linux（Ubuntu），自动适配 Chromium 启动参数
 - **代理池支持** - 可配置代理避免被封
 
 ## 安装依赖
 
+### Windows
+
 ```bash
 pip install -r requirements.txt
+playwright install chromium
+```
+
+### Ubuntu / Linux
+
+```bash
+pip install -r requirements.txt
+playwright install chromium
+
+# 安装 Chromium 系统依赖（必需！）
+sudo playwright install-deps chromium
+
+# 安装中文字体（页面渲染必需）
+sudo apt-get install -y fonts-noto-cjk
 ```
 
 主要依赖：
@@ -21,11 +39,6 @@ pip install -r requirements.txt
 - `playwright` - 动态页面渲染
 - `beautifulsoup4` - HTML 解析
 - `aiohttp` - 异步 HTTP
-
-安装 Playwright 浏览器：
-```bash
-playwright install chromium
-```
 
 ## 快速开始
 
@@ -53,26 +66,32 @@ python main.py --limit 100 --workers 30
 
 ## 数据存储
 
-数据存储在 `data/crawl_data.db`（SQLite）：
+数据存储在 `data/crawl_data.db`（SQLite），持仓和调仓数据按 `crawl_date` 字段隔离，多天运行不会互相干扰：
 
 ```sql
--- 选手表
+-- 选手表（每个选手唯一）
 players (
     zh_id TEXT PRIMARY KEY,
     name, followers, total_return, daily_return,
     net_value, max_drawdown, win_rate, days, concept, ...
 )
 
--- 持仓表
+-- 持仓表（按 crawl_date 隔离）
 positions (
+    id INTEGER PRIMARY KEY,
     zh_id, stock_code, stock_name,
-    cost_price, current_price, profit_ratio, position_ratio
+    cost_price, current_price, profit_ratio, position_ratio,
+    crawl_date TEXT,  -- 爬取日期，如 '2026-05-10'
+    ...
 )
 
--- 调仓表
+-- 调仓表（按 crawl_date 隔离）
 trades (
+    id INTEGER PRIMARY KEY,
     zh_id, stock_code, stock_name, trade_date,
-    direction, position_change, ...
+    direction, position_change, position_ratio,
+    crawl_date TEXT,  -- 爬取日期，如 '2026-05-10'
+    ...
 )
 ```
 
@@ -85,7 +104,7 @@ python main.py --analyze
 
 分析报告包含：
 - **持仓最多的股票 Top 20** - 被多少选手持有、平均仓位、平均盈利
-- **选手仓位分布** - 空仓、3成以下、3-5成、5-7成、7-9成、9成以上
+- **选手仓位分布** - 空仓、1成以下、3成以下、3-5成、5-7成、7-9成、9成以上
 - **股票盈亏分布** - 按盈利区间分类
 - **当日盈利最高的选手 Top 10**
 
@@ -143,6 +162,8 @@ dfcfshipan/
 1. 获取选手列表 (API)
        ↓
 2. 创建 AsyncPlaywrightPool (复用浏览器)
+   - Chromium 启动参数: --no-sandbox, --disable-dev-shm-usage 等
+   - Context 反检测配置: Windows Chrome UA, zh-CN locale, Asia/Shanghai 时区
        ↓
 3. 对每个选手：
    ┌─────────────────────────────────────┐
@@ -153,8 +174,9 @@ dfcfshipan/
    └─────────────────────────────────────┘
        ↓
 4. 批量存入 SQLite (每 50 个选手)
+   - 按 crawl_date 隔离数据
        ↓
-5. 每 50 个选手保存检查点
+5. 每 50 个选手保存检查点（原子写入）
 ```
 
 ### 浏览器连接池
@@ -162,6 +184,7 @@ dfcfshipan/
 - 单个 Playwright + Browser 实例启动一次
 - 多个 BrowserContext 组成连接池
 - 使用 Semaphore 控制并发，无需额外锁
+- Context 创建时自动配置反检测参数
 
 ### 断点续传
 
@@ -174,10 +197,27 @@ dfcfshipan/
 
 ## 注意事项
 
-1. **并发数建议 10-20**，过高可能被网站限流
-2. **自动重试机制**，失败自动重试 3 次
-3. **调仓记录需要滚动加载**，爬取较慢
-4. **建议使用代理池**避免被封
+1. **Ubuntu 用户必须运行 `sudo playwright install-deps chromium`**，否则 Chromium 无法启动
+2. **缺少中文字体**会导致页面 JS 渲染异常，运行 `sudo apt-get install fonts-noto-cjk`
+3. **并发数建议 10-20**，过高可能被网站限流
+4. **自动重试机制**，失败自动重试 3 次，被反爬拦截时会打印页面片段到日志
+5. **调仓记录需要滚动加载**，爬取较慢
+6. **建议使用代理池**避免被封
+
+## 故障排查
+
+### 页面全部爬取为空
+
+查看 `logs/spider.log`，常见原因：
+
+| 日志内容 | 原因 | 解决方案 |
+|----------|------|---------|
+| `Chromium 浏览器启动成功` 后无后续 | Context 创建或页面获取超时 | 检查网络连接，降低 `--workers` 并发数 |
+| `页面可能被拦截` + 页面片段 | 网站 WAF 反爬 | 使用代理池，降低并发，增加等待时间 |
+| `Unable to connect to browser` | Chromium 系统依赖缺失 | 运行 `sudo playwright install-deps chromium` |
+| `Failed to launch browser` | 缺少运行时库 | 检查 `playwright install chromium` 是否执行 |
+| `未能从页面提取 xxxx` | 网站改版或反爬 | 看日志中页面片段是否包含正常数据 |
+| `timeout: exceeded 60000ms` | 页面加载超时 | 网络较慢时增大 `--workers` 会加剧超时，建议调小 |
 
 ## 榜单 API 映射
 

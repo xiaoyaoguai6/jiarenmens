@@ -13,7 +13,7 @@ from typing import Optional, Generator
 
 from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
 
-from src.config import USER_AGENT
+from src.config import USER_AGENT, MOBILE_VIEWPORT, DEVICE_SCALE_FACTOR
 from src.utils.logger import setup_logger
 
 logger = setup_logger()
@@ -65,27 +65,18 @@ class AsyncPlaywrightPool:
 
         self._initialized = False
 
-    # 反检测脚本：在每个新 page 加载前注入，覆盖常见的自动化标志
+    # 反检测脚本：与 iPhone Mobile Safari UA 保持一致
+    # 不伪造 plugins / window.chrome / WebGL Intel，否则与 Safari 真实环境矛盾
     _STEALTH_SCRIPT = """
     // hide webdriver flag
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 
-    // fake plugins length
-    Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5]
-    });
-
-    // fake languages
+    // align languages with locale
     Object.defineProperty(navigator, 'languages', {
         get: () => ['zh-CN', 'zh', 'en']
     });
 
-    // ensure window.chrome exists
-    if (!window.chrome) {
-        window.chrome = { runtime: {} };
-    }
-
-    // patch permissions.query for notifications
+    // patch permissions.query for notifications (一些站点会用它探测自动化)
     const __origQuery = window.navigator.permissions && window.navigator.permissions.query;
     if (__origQuery) {
         window.navigator.permissions.query = (parameters) => (
@@ -94,24 +85,18 @@ class AsyncPlaywrightPool:
                 : __origQuery(parameters)
         );
     }
-
-    // spoof WebGL vendor / renderer
-    const __getParameter = WebGLRenderingContext.prototype.getParameter;
-    WebGLRenderingContext.prototype.getParameter = function(parameter) {
-        if (parameter === 37445) return 'Intel Inc.';
-        if (parameter === 37446) return 'Intel Iris OpenGL Engine';
-        return __getParameter.call(this, parameter);
-    };
     """
 
     async def _create_context(self) -> BrowserContext:
-        """创建带反检测配置的 BrowserContext"""
+        """创建带反检测配置的 BrowserContext（伪装为 iPhone Mobile Safari）"""
         ctx = await self.browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
+            viewport=MOBILE_VIEWPORT,
             user_agent=USER_AGENT,
             locale='zh-CN',
             timezone_id='Asia/Shanghai',
-            has_touch=False,
+            has_touch=True,
+            is_mobile=True,
+            device_scale_factor=DEVICE_SCALE_FACTOR,
         )
         # 注入反检测脚本（每个新 page 加载前自动执行）
         await ctx.add_init_script(self._STEALTH_SCRIPT)

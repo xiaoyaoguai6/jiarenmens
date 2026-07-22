@@ -44,3 +44,6 @@ logs/
 # Data (local storage)
 data/
 *.db
+
+# Large APK / temp files
+tmp/

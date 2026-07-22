@@ -11,12 +11,18 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional, Generator
 
+from pathlib import Path
 from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
 
 from src.config import USER_AGENT, MOBILE_VIEWPORT, DEVICE_SCALE_FACTOR
 from src.utils.logger import setup_logger
 
 logger = setup_logger()
+
+# 从独立 JS 文件加载增强版反检测脚本
+_stealth_path = Path(__file__).parent / "_stealth_script.js"
+with open(_stealth_path, "r", encoding="utf-8") as _f:
+    _STEALTH_SCRIPT = _f.read()
 
 
 class AsyncPlaywrightPool:
@@ -44,7 +50,8 @@ class AsyncPlaywrightPool:
     def __init__(
         self,
         pool_size: int = 5,
-        headless: bool = True
+        headless: bool = True,
+        channel: Optional[str] = None
     ):
         """
         初始化连接池
@@ -52,9 +59,11 @@ class AsyncPlaywrightPool:
         Args:
             pool_size: Context 池大小，默认 5
             headless: 是否无头模式，默认 True
+            channel: 浏览器 channel (如 'chrome' 使用系统 Chrome)，默认 None (Playwright 内置 Chromium)
         """
         self.pool_size = pool_size
         self.headless = headless
+        self.channel = channel
 
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
@@ -64,46 +73,6 @@ class AsyncPlaywrightPool:
         self._semaphore: asyncio.Semaphore = None
 
         self._initialized = False
-
-    # 反检测 + 伪造东方财富 APP webview 桥接对象
-    # 站点 JS 检测 window.emh5 / window.EMProjJs / window.EMRead 是否存在来判定"在 APP 内"
-    # 我们注入空壳对象，并把可能被调用的方法 stub 成无害实现
-    _STEALTH_SCRIPT = """
-    // hide webdriver flag
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-
-    // align languages with locale
-    Object.defineProperty(navigator, 'languages', {
-        get: () => ['zh-CN', 'zh', 'en']
-    });
-
-    // patch permissions.query for notifications
-    const __origQuery = window.navigator.permissions && window.navigator.permissions.query;
-    if (__origQuery) {
-        window.navigator.permissions.query = (parameters) => (
-            parameters && parameters.name === 'notifications'
-                ? Promise.resolve({ state: Notification.permission })
-                : __origQuery(parameters)
-        );
-    }
-
-    // 伪造 EMRead webview 桥接对象，避免站点判定"非 APP"弹 confirm
-    function __mkBridge() {
-        const noop = function() {};
-        const stub = function() { return ''; };
-        return new Proxy({}, {
-            get: (t, k) => {
-                if (k === 'toJSON' || k === Symbol.toPrimitive) return undefined;
-                return t[k] || stub;
-            },
-            set: (t, k, v) => { t[k] = v; return true; }
-        });
-    }
-    if (!window.emh5) window.emh5 = __mkBridge();
-    if (!window.EMProjJs) window.EMProjJs = __mkBridge();
-    if (!window.EMRead) window.EMRead = __mkBridge();
-    if (!window.emjs) window.emjs = __mkBridge();
-    """
 
     async def _create_context(self) -> BrowserContext:
         """创建带反检测配置的 BrowserContext（伪装为 iPhone Mobile Safari）"""
@@ -117,8 +86,39 @@ class AsyncPlaywrightPool:
             device_scale_factor=DEVICE_SCALE_FACTOR,
         )
         # 注入反检测脚本（每个新 page 加载前自动执行）
-        await ctx.add_init_script(self._STEALTH_SCRIPT)
+        await ctx.add_init_script(_STEALTH_SCRIPT)
         return ctx
+
+    async def _patch_page_cdp(self, page):
+        """在 page 上用 CDP Network.setUserAgentOverride 修正 Client Hints，
+        移除 'HeadlessChrome' 标识，伪装为正常 Chrome/移动端。
+
+        注意：CDP session 必须保持活跃，detach 后设置会失效。
+        """
+        try:
+            cdp = await page.context.new_cdp_session(page)
+            await cdp.send("Network.setUserAgentOverride", {
+                "userAgent": USER_AGENT,
+                "acceptLanguage": "zh-CN",
+                "platform": "iPhone",
+                "userAgentMetadata": {
+                    "brands": [
+                        {"brand": "Chromium", "version": "131"},
+                        {"brand": "Not_A Brand", "version": "24"},
+                        {"brand": "iPhone", "version": "16"},
+                    ],
+                    "fullVersion": "131.0.6778.86",
+                    "platform": "iOS",
+                    "platformVersion": "16.6.0",
+                    "architecture": "",
+                    "model": "iPhone",
+                    "mobile": True,
+                },
+            })
+            # 注意：不要 detach，detach 后设置会失效
+            # CDP session 会在 page 关闭时自动清理
+        except Exception as e:
+            logger.warning(f"CDP patch Chrome hints failed: {e}")
 
     async def initialize(self):
         """初始化 Playwright 和 Browser，创建 Context 池"""
@@ -136,13 +136,15 @@ class AsyncPlaywrightPool:
         self.browser = await self.playwright.chromium.launch(
             headless=self.headless,
             args=[
+                '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
                 '--disable-web-security',
                 '--disable-features=IsolateOrigins,site-per-process',
-            ]
+            ],
+            channel=self.channel,
         )
         logger.debug("Chromium 浏览器启动成功")
 
@@ -239,6 +241,16 @@ class AsyncPlaywrightPool:
         finally:
             await self.release(ctx)
 
+    async def new_page(self, ctx: BrowserContext) -> Page:
+        """创建新 page 并自动应用 CDP patch（修正 HeadlessChrome 标识）。
+
+        优先使用此方法代替 ctx.new_page()，以确保所有请求都带有正确的
+        Client Hints headers。
+        """
+        page = await ctx.new_page()
+        await self._patch_page_cdp(page)
+        return page
+
     async def fetch_page(self, url: str, timeout: int = 60) -> Optional[str]:
         """
         快捷方法：直接获取页面内容
@@ -251,7 +263,7 @@ class AsyncPlaywrightPool:
             页面 HTML 内容，或 None
         """
         async with self.get_context(timeout) as ctx:
-            page = await ctx.new_page()
+            page = await self.new_page(ctx)
             try:
                 await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
                 await page.wait_for_load_state('networkidle', timeout=15000)
@@ -283,7 +295,7 @@ class AsyncPlaywrightPool:
             页面 HTML 内容，或 None
         """
         async with self.get_context(timeout) as ctx:
-            page = await ctx.new_page()
+            page = await self.new_page(ctx)
             try:
                 await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
                 await page.wait_for_load_state('networkidle', timeout=15000)

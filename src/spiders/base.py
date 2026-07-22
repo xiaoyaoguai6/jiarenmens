@@ -93,7 +93,7 @@ class AsyncBaseSpider:
         for attempt in range(retries):
             try:
                 async with self.pool.get_context(timeout) as ctx:
-                    page = await ctx.new_page()
+                    page = await self.pool.new_page(ctx)
                     try:
                         await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
                         await _wait_for_target(page, wait_for_selector, wait_for_text)
@@ -138,7 +138,7 @@ class AsyncBaseSpider:
         for attempt in range(retries):
             try:
                 async with self.pool.get_context(timeout) as ctx:
-                    page = await ctx.new_page()
+                    page = await self.pool.new_page(ctx)
                     try:
                         await page.goto(url, wait_until='domcontentloaded', timeout=timeout * 1000)
                         await _wait_for_target(page, wait_for_selector, wait_for_text)

@@ -717,7 +717,7 @@ _FOLLOW_HTML = r"""<!doctype html>
   .add-box button { padding: 8px 18px; border: none; border-radius: 8px;
                     background: var(--primary); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
   .add-box button:hover { background: #2563eb; }
-  .add-box button:disabled { opacity: .5; cursor: not-allowed; }
+  .add-box button:disabled { opacity: .7; cursor: not-allowed; background: #93a3c7; }
   .add-msg { font-size: 13px; margin-bottom: 10px; padding: 6px 12px; border-radius: 6px; display: none; }
   .add-msg.success { display: block; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
   .add-msg.error { display: block; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }

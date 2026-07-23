@@ -96,6 +96,29 @@ def _init_follow_db():
     _FOLLOW_DB_INITED = True
 
 
+@app.get("/api/search")
+def search_players(q: str = Query("", description="搜索关键词")):
+    """搜索选手（按组合名或选手ID模糊匹配）"""
+    if not q.strip():
+        return {"total": 0, "data": []}
+    storage = get_crawl_storage()
+    players = storage.load_players()
+    keyword = q.strip().lower()
+    matched = []
+    for p in players:
+        name = (p.get("name") or "").lower()
+        zh_id = (p.get("zh_id") or "").lower()
+        if keyword in name or keyword in zh_id:
+            matched.append({
+                "zh_id": p.get("zh_id"),
+                "name": p.get("name", ""),
+                "followers": p.get("followers", 0),
+                "total_return": p.get("total_return", 0),
+                "daily_return": p.get("daily_return", 0),
+            })
+    return {"total": len(matched), "data": matched[:50]}
+
+
 @app.post("/api/follow/{zh_id}")
 def follow_player(zh_id: str):
     """关注选手"""
@@ -402,11 +425,21 @@ _RANKINGS_HTML = r"""<!doctype html>
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
          background: #f0f2f5; color: #1f2937; padding: 20px; }
   .container { max-width: 960px; margin: 0 auto; }
-  .nav { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+  .nav { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
   .nav h1 { font-size: 22px; color: #1e3a8a; margin: 0; }
   .nav a { text-decoration: none; color: #1e3a8a; font-size: 14px; padding: 6px 14px;
            border: 1px solid #1e3a8a; border-radius: 6px; }
   .nav a:hover { background: #eff6ff; }
+  .search-box { display: flex; gap: 6px; margin-bottom: 16px; }
+  .search-box input { flex: 1; padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 6px;
+                      font-size: 14px; outline: none; }
+  .search-box input:focus { border-color: #1e3a8a; box-shadow: 0 0 0 2px rgba(30,58,138,.1); }
+  .search-box button { padding: 8px 18px; border: 1px solid #1e3a8a; border-radius: 6px;
+                       background: #1e3a8a; color: #fff; font-size: 14px; cursor: pointer; }
+  .search-box button:hover { background: #2563eb; }
+  .search-results { display: none; }
+  .search-mode .tabs, .search-mode .pagination, .search-mode .rank-table { display: none; }
+  .search-mode .search-results { display: block; }
   .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   .tab { padding: 8px 20px; border: 1px solid #d1d5db; border-radius: 6px;
          background: #fff; cursor: pointer; font-size: 14px; color: #374151;
@@ -439,6 +472,7 @@ _RANKINGS_HTML = r"""<!doctype html>
                 font-size: 12px; cursor: pointer; background: #fff; color: #374151; }
   .follow-btn:hover { background: #eff6ff; }
   .follow-btn.followed { background: #dbeafe; color: #1e3a8a; border-color: #1e3a8a; }
+  .search-hint { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -447,10 +481,15 @@ _RANKINGS_HTML = r"""<!doctype html>
     <h1>📊 公开实盘排行榜</h1>
     <a href="/follow">❤️ 关注列表</a>
   </div>
+  <div class="search-box">
+    <input id="searchInput" placeholder="搜索选手名或组合ID..." onkeydown="if(event.key==='Enter') doSearch()">
+    <button onclick="doSearch()">搜索</button>
+  </div>
   <div class="tabs" id="tabs"></div>
+  <div id="searchMode" class="search-results"></div>
   <div class="info" id="info"></div>
   <div id="loading" class="loading">加载中...</div>
-  <table id="table" style="display:none">
+  <table id="table" class="rank-table" style="display:none">
     <thead><tr><th>#</th><th>组合名</th><th>选手名</th><th>粉丝数</th><th>收益率</th><th>操作</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
@@ -485,7 +524,47 @@ function switchTab(type) {
   currentType = type;
   currentPage = 0;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.textContent === type));
+  document.getElementById('searchMode').style.display = 'none';
+  document.getElementById('table').style.display = '';
+  document.getElementById('pagination').style.display = '';
   render();
+}
+
+async function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  const searchMode = document.getElementById('searchMode');
+  searchMode.style.display = 'block';
+  document.getElementById('table').style.display = 'none';
+  document.getElementById('pagination').style.display = 'none';
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('info').textContent = '搜索: ' + q;
+
+  try {
+    const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    if (d.total === 0) {
+      searchMode.innerHTML = '<div class="search-hint">未找到匹配 "' + esc(q) + '" 的选手</div>';
+      return;
+    }
+    let html = '<div class="search-hint">找到 ' + d.total + ' 个匹配结果（最多显示50条）</div>';
+    html += '<table><thead><tr><th>组合名</th><th>选手名</th><th>粉丝数</th><th>总收益</th><th>日收益</th><th>操作</th></tr></thead><tbody>';
+    d.data.forEach(p => {
+      const isFollowed = followedSet.has(p.zh_id);
+      const trCls = p.total_return > 0 ? 'positive' : p.total_return < 0 ? 'negative' : 'zero';
+      const drCls = p.daily_return > 0 ? 'positive' : p.daily_return < 0 ? 'negative' : 'zero';
+      html += '<tr><td><a class="player-link" href="/player/' + encodeURIComponent(p.zh_id) + '">' + esc(p.name||'--') + '</a></td>'
+        + '<td class="fans">' + esc(p.zh_id) + '</td>'
+        + '<td>' + (p.followers||0).toLocaleString() + '</td>'
+        + '<td class="' + trCls + '">' + (p.total_return||0).toFixed(2) + '%</td>'
+        + '<td class="' + drCls + '">' + (p.daily_return||0).toFixed(2) + '%</td>'
+        + '<td><button class="follow-btn' + (isFollowed ? ' followed' : '') + '" data-zh="' + p.zh_id + '" onclick="toggleFollow(this)">' + (isFollowed ? '已关注' : '+ 关注') + '</button></td></tr>';
+    });
+    html += '</tbody></table>';
+    searchMode.innerHTML = html;
+  } catch(e) {
+    searchMode.innerHTML = '<div style="color:#dc2626">搜索失败: ' + e.message + '</div>';
+  }
 }
 
 async function loadData() {
@@ -949,6 +1028,7 @@ def root():
                 "POST /api/follow/{zh_id}": "关注选手",
                 "DELETE /api/follow/{zh_id}": "取消关注",
                 "GET /api/player-detail/{zh_id}": "选手实时详情（rtV2+持仓+调仓+排名）",
+                "GET /api/search?q=": "搜索选手（按组合名或选手ID）",
                 "GET /rankings": "公开实盘排行榜 HTML 页面",
                 "GET /follow": "关注列表 HTML 页面",
                 "GET /player/{zh_id}": "选手详情 HTML 页面",

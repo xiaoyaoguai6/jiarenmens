@@ -699,6 +699,17 @@ _FOLLOW_HTML = r"""<!doctype html>
   .follow-btn { padding: 3px 10px; border-radius: 4px; border: 1px solid #dc2626;
                 font-size: 12px; cursor: pointer; background: #fff; color: #dc2626; }
   .follow-btn:hover { background: #fef2f2; }
+  .add-box { display: flex; gap: 8px; margin-bottom: 16px; }
+  .add-box input { flex: 1; padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+                   font-size: 14px; outline: none; }
+  .add-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(30,58,138,.1); }
+  .add-box button { padding: 8px 18px; border: none; border-radius: 8px;
+                    background: var(--primary); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .add-box button:hover { background: #2563eb; }
+  .add-box button:disabled { opacity: .5; cursor: not-allowed; }
+  .add-msg { font-size: 13px; margin-bottom: 10px; padding: 6px 12px; border-radius: 6px; display: none; }
+  .add-msg.success { display: block; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .add-msg.error { display: block; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
   .positive { color: #dc2626; } .negative { color: #16a34a; } .zero { color: #9ca3af; }
   .loading { text-align: center; padding: 40px; color: #6b7280; }
   .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 15px; }
@@ -710,6 +721,11 @@ _FOLLOW_HTML = r"""<!doctype html>
     <h1>❤️ 关注列表</h1>
     <a href="/rankings">📊 排行榜</a>
   </div>
+  <div class="add-box">
+    <input id="addInput" placeholder="输入组合ID添加关注..." onkeydown="if(event.key==='Enter') addPlayer()">
+    <button id="addBtn" onclick="addPlayer()">+ 添加</button>
+  </div>
+  <div class="add-msg" id="addMsg"></div>
   <div class="info" id="info"></div>
   <div id="loading" class="loading">加载中...</div>
   <table id="table" style="display:none">
@@ -719,6 +735,26 @@ _FOLLOW_HTML = r"""<!doctype html>
   <div id="empty" class="empty" style="display:none">还没有关注任何选手，去 <a href="/rankings">排行榜</a> 看看吧</div>
 </div>
 <script>
+async function addPlayer() {
+  const input = document.getElementById('addInput');
+  const btn = document.getElementById('addBtn');
+  const msg = document.getElementById('addMsg');
+  const zh = input.value.trim();
+  if (!zh) { msg.className = 'add-msg error'; msg.textContent = '请输入组合ID'; return; }
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/follow/' + encodeURIComponent(zh), { method: 'POST' });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || '添加失败'); }
+    msg.className = 'add-msg success';
+    msg.textContent = '✅ 添加成功！';
+    input.value = '';
+    location.reload();
+  } catch(e) {
+    msg.className = 'add-msg error';
+    msg.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+  }
+}
 async function load() {
   const loading = document.getElementById('loading');
   const table = document.getElementById('table');

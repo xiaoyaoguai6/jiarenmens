@@ -257,6 +257,10 @@ def player_detail(zh_id: str):
             "followers": int(detail.get("concernCnt", 0)),
             "total_return": detail.get("rate"),
             "daily_return": detail.get("rateDay"),
+            "return_5d": detail.get("rate5Day"),
+            "return_20d": detail.get("rate20Day"),
+            "return_60d": detail.get("rate60Day"),
+            "return_250d": detail.get("rate250Day"),
             "net_value": detail.get("JZ"),
             "max_drawdown": detail.get("maxDrawDown"),
             "win_rate": detail.get("dealRate"),
@@ -285,6 +289,10 @@ def player_detail(zh_id: str):
             for t in (trades or [])
         ],
         "rankings": rankings,
+        "tendency": rtv2.get("tendency", []),
+        "tendency_summary": rtv2.get("tendencySummary", {}),
+        "dimensions": rtv2.get("dimensions", {}),
+        "evaluation": rtv2.get("evaluation", {}),
     }
 
 
@@ -768,43 +776,118 @@ _PLAYER_HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>选手详情</title>
 <style>
+  :root {
+    --primary: #1e3a8a;
+    --primary-light: #3b82f6;
+    --primary-bg: #eff6ff;
+    --bg: #f0f4f9;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --radius: 12px;
+    --shadow: 0 1px 4px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-         background: #f0f2f5; color: #1f2937; padding: 20px; }
-  .container { max-width: 900px; margin: 0 auto; }
-  .nav { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-  .nav h1 { font-size: 22px; color: #1e3a8a; margin: 0; }
-  .nav a { text-decoration: none; color: #1e3a8a; font-size: 14px; padding: 6px 14px;
-           border: 1px solid #1e3a8a; border-radius: 6px; }
-  .nav a:hover { background: #eff6ff; }
-  .loading { text-align: center; padding: 40px; color: #6b7280; }
-  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .card h2 { font-size: 16px; color: #1e3a8a; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-  .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px; }
-  .info-item .label { font-size: 12px; color: #6b7280; }
-  .info-item .value { font-size: 16px; font-weight: 600; }
-  .positive { color: #dc2626; } .negative { color: #16a34a; } .zero { color: #9ca3af; }
-  .rank-badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
-                font-size: 12px; margin: 2px; background: #dbeafe; color: #1e3a8a; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-  th { color: #475569; font-weight: 600; background: #f8fafc; }
-  .error { text-align: center; padding: 40px; color: #dc2626; }
-  .follow-btn { padding: 6px 16px; border-radius: 6px; border: 1px solid #1e3a8a;
-                font-size: 14px; cursor: pointer; }
-  .follow-btn:hover { background: #eff6ff; }
-  .follow-btn.followed { background: #dbeafe; color: #1e3a8a; }
+         background: var(--bg); color: var(--text); padding: 24px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+
+  /* Nav */
+  .nav { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .nav-back { text-decoration: none; color: var(--text-secondary); font-size: 14px;
+              padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px;
+              transition: all .15s; }
+  .nav-back:hover { background: var(--primary-bg); color: var(--primary); }
+  .nav-title { font-size: 20px; font-weight: 700; color: var(--text); flex: 1; }
+  .nav-links { display: flex; gap: 8px; }
+  .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 13px;
+                 padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .nav-links a:hover { background: var(--primary-bg); color: var(--primary); }
+
+  /* Loading / Error */
+  .loading, .error { text-align: center; padding: 60px 20px; color: var(--text-secondary); font-size: 15px; }
+  .error { color: var(--danger); }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px 24px;
+          margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text-secondary);
+                text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px;
+                display: flex; align-items: center; gap: 6px; }
+
+  /* Metrics grid */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .metric { padding: 14px; border-radius: 10px; background: #f8fafc; text-align: center; }
+  .metric .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+  .metric .value { font-size: 18px; font-weight: 700; }
+  .metric .sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Analysis scores */
+  .scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+  .score-item { text-align: center; padding: 12px 8px; border-radius: 10px; background: #f8fafc; }
+  .score-item .ring { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 6px;
+                      display: flex; align-items: center; justify-content: center;
+                      font-size: 16px; font-weight: 700; color: #fff; }
+  .score-item .label { font-size: 11px; color: var(--text-secondary); }
+  .score-item .sub-label { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+
+  /* Chart */
+  .chart-wrap { position: relative; width: 100%; height: 260px; }
+  .chart-wrap canvas { width: 100%; height: 100%; border-radius: 8px; }
+  .chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 10px; font-size: 12px; }
+  .chart-legend span { display: flex; align-items: center; gap: 4px; }
+  .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  /* Ranking badges */
+  .rankings-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rank-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+                border-radius: 20px; font-size: 12px; font-weight: 500;
+                background: var(--primary-bg); color: var(--primary);
+                border: 1px solid rgba(30,58,138,.15); }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: .3px; background: #f8fafc; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+
+  /* Colors */
+  .c-positive { color: var(--danger); }
+  .c-negative { color: var(--success); }
+  .c-zero { color: var(--text-secondary); }
+  .c-primary { color: var(--primary); }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px;
+         font-size: 11px; background: #f1f5f9; color: var(--text-secondary); margin: 1px; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .metrics { grid-template-columns: repeat(3, 1fr); }
+    .scores { grid-template-columns: repeat(3, 1fr); }
+    .nav-title { font-size: 16px; }
+  }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="nav">
-    <h1 id="playerName">选手详情</h1>
-    <a href="/rankings">📊 排行榜</a>
-    <a href="/follow">❤️ 关注列表</a>
+    <a class="nav-back" href="javascript:history.back()">← 返回</a>
+    <span class="nav-title" id="playerName">选手详情</span>
+    <span class="nav-links">
+      <a href="/rankings">排行榜</a>
+      <a href="/follow">关注</a>
+    </span>
   </div>
-  <div id="loading" class="loading">加载中...</div>
+  <div id="loading" class="loading"><div style="font-size:24px;margin-bottom:8px">⏳</div>加载中...</div>
   <div id="content" style="display:none"></div>
 </div>
 <script>
@@ -815,7 +898,7 @@ async function load() {
   const content = document.getElementById('content');
   try {
     const r = await fetch('/api/player-detail/' + encodeURIComponent(zhId));
-    if (!r.ok) { loading.textContent = '选手不存在或API错误'; return; }
+    if (!r.ok) { loading.className = 'error'; loading.textContent = '❌ 选手不存在或API错误'; return; }
     const d = await r.json();
     loading.style.display = 'none';
     content.style.display = '';
@@ -825,76 +908,203 @@ async function load() {
 
     let html = '';
 
-    // ── 基本信息 ──
-    html += '<div class="card"><h2>📋 基本信息</h2><div class="info-grid">';
-    const fields = [
-      ['组合名称', det.name || '--'],
-      ['选手ID', zhId],
-      ['粉丝数', (det.followers||0).toLocaleString()],
-      ['总收益率', fmtPct(det.total_return)],
-      ['日收益率', fmtPct(det.daily_return)],
-      ['净值', det.net_value != null ? Number(det.net_value).toFixed(4) : '--'],
-      ['最大回撤', det.max_drawdown != null ? Number(det.max_drawdown).toFixed(2) + '%' : '--'],
-      ['胜率', det.win_rate != null ? Number(det.win_rate).toFixed(2) + '%' : '--'],
-      ['运行天数', det.days || '--'],
+    // ── Key Metrics ──
+    html += '<div class="card"><div class="card-title">📊 关键指标</div><div class="metrics">';
+    const metrics = [
+      ['总收益率', fmtPct(det.total_return), ''],
+      ['日收益率', fmtPct(det.daily_return), ''],
+      ['净值', det.net_value != null ? Number(det.net_value).toFixed(4) : '--', ''],
+      ['最大回撤', det.max_drawdown != null ? Number(det.max_drawdown).toFixed(2) + '%' : '--', '越小越好'],
+      ['日胜率', det.win_rate != null ? Number(det.win_rate).toFixed(1) + '%' : '--', ''],
+      ['运行天数', det.days ? Number(det.days).toLocaleString() : '--', ''],
+      ['粉丝数', det.followers ? Number(det.followers).toLocaleString() : '0', ''],
+      ['5日收益', fmtPct(det.return_5d), ''],
+      ['20日收益', fmtPct(det.return_20d), ''],
+      ['60日收益', fmtPct(det.return_60d), ''],
+      ['250日收益', fmtPct(det.return_250d), ''],
     ];
-    fields.forEach(f => {
-      html += '<div class="info-item"><div class="label">' + f[0] + '</div><div class="value">' + f[1] + '</div></div>';
+    metrics.forEach(m => {
+      html += '<div class="metric"><div class="label">' + m[0] + '</div><div class="value">' + m[1] + '</div>';
+      if (m[2]) html += '<div class="sub">' + m[2] + '</div>';
+      html += '</div>';
     });
-    if (det.intro) html += '<div class="info-item" style="grid-column:1/-1"><div class="label">简介</div><div class="value" style="font-size:14px;font-weight:400">' + esc(det.intro) + '</div></div>';
-    if (det.labels && det.labels.length) {
-      html += '<div class="info-item" style="grid-column:1/-1"><div class="label">标签</div><div class="value" style="font-size:13px;font-weight:400">' + det.labels.join(' · ') + '</div></div>';
-    }
     html += '</div></div>';
 
-    // ── 今日榜单排名 ──
+    // ── Analysis Scores ──
+    const dim = d.dimensions || {};
+    const ev = d.evaluation || {};
+    const scores = [
+      { label: '综合评分', val: ev.score, color: ev.score >= 80 ? '#16a34a' : ev.score >= 50 ? '#d97706' : '#dc2626', unit: '分' },
+      { label: '收益能力', val: ev.profitRateScore, color: ev.profitRateScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+      { label: '日胜率', val: ev.dayWinRateScore, color: ev.dayWinRateScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+      { label: '风控水平', val: ev.maxDrawdownScore, color: ev.maxDrawdownScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+      { label: '夏普比', val: ev.sharpeRatioScore, color: ev.sharpeRatioScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+      { label: '分散度', val: ev.investmentDispersionScore, color: ev.investmentDispersionScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+    ];
+    if (scores.some(s => s.val != null)) {
+      html += '<div class="card"><div class="card-title">🎯 分析评分</div><div class="scores">';
+      scores.forEach(s => {
+        const v = s.val != null ? Number(s.val) : null;
+        html += '<div class="score-item"><div class="ring" style="background:' + (v != null ? s.color : '#94a3b8') + '">'
+          + (v != null ? Math.round(v) : '--') + '</div>'
+          + '<div class="label">' + s.label + '</div>'
+          + '<div class="sub-label">' + (dim.profitRate ? '收益 ' + dim.profitRate + '%' : '') + '</div></div>';
+      });
+      html += '</div></div>';
+    }
+
+    // ── Return Rate Trend Chart ──
+    const tendency = d.tendency || [];
+    if (tendency.length > 1) {
+      html += '<div class="card"><div class="card-title">📈 收益率走势</div>';
+      html += '<div class="chart-wrap"><canvas id="trendChart"></canvas></div>';
+      html += '<div class="chart-legend">'
+        + '<span><span class="dot" style="background:var(--primary)"></span> 组合收益率</span>'
+        + '<span><span class="dot" style="background:#f59e0b"></span> 基准指数</span>'
+        + '</div></div>';
+    }
+
+    // ── Today's Rankings ──
     if (d.rankings && d.rankings.length) {
-      html += '<div class="card"><h2>🏆 今日榜单排名</h2>';
+      html += '<div class="card"><div class="card-title">🏆 今日榜单排名</div><div class="rankings-wrap">';
       d.rankings.forEach(rk => {
         const sign = rk.return > 0 ? '+' : '';
         html += '<span class="rank-badge">' + esc(rk.rank_type) + ' 第 ' + rk.rank + ' 名 (' + sign + rk.return.toFixed(2) + '%)</span>';
       });
-      html += '</div>';
+      html += '</div></div>';
     }
 
-    // ── 持仓 ──
-    html += '<div class="card"><h2>📦 持仓 (' + (d.positions||[]).length + ')</h2>';
-    if (d.positions && d.positions.length) {
-      html += '<table><thead><tr><th>股票</th><th>代码</th><th>成本价</th><th>现价</th><th>盈亏</th><th>仓位</th></tr></thead><tbody>';
-      d.positions.forEach(p => {
+    // ── Tendency Summary ──
+    const ts = d.tendency_summary || {};
+    if (ts.beatIndex != null) {
+      html += '<div class="card"><div class="card-title">📊 跑赢指数</div><div class="metrics" style="grid-template-columns:repeat(3,1fr)">';
+      html += '<div class="metric"><div class="label">累计收益</div><div class="value">' + fmtPct(ts.profit) + '</div></div>';
+      html += '<div class="metric"><div class="label">跑赢指数</div><div class="value c-primary">' + (ts.beatIndex != null ? ts.beatIndex + '%' : '--') + '</div></div>';
+      html += '<div class="metric"><div class="label">跑赢概率</div><div class="value c-primary">' + (ts.beatRate != null ? ts.beatRate + '%' : '--') + '</div></div>';
+      html += '</div></div>';
+    }
+
+    // ── Positions ──
+    const positions = d.positions || [];
+    html += '<div class="card"><div class="card-title">📦 持仓 (' + positions.length + ')</div>';
+    if (positions.length) {
+      html += '<div class="table-wrap"><table><thead><tr><th>股票</th><th>代码</th><th>成本价</th><th>现价</th><th>盈亏</th><th>仓位</th></tr></thead><tbody>';
+      positions.forEach(p => {
         const pr = p.profit_ratio;
-        const cls = pr > 0 ? 'positive' : pr < 0 ? 'negative' : 'zero';
-        html += '<tr><td>' + esc(p.stock_name) + '</td><td>' + esc(p.stock_code) + '</td>'
+        const cls = pr > 0 ? 'c-positive' : pr < 0 ? 'c-negative' : 'c-zero';
+        html += '<tr><td><strong>' + esc(p.stock_name) + '</strong></td><td>' + esc(p.stock_code) + '</td>'
           + '<td>' + (p.cost_price != null ? Number(p.cost_price).toFixed(2) : '--') + '</td>'
           + '<td>' + (p.current_price != null ? Number(p.current_price).toFixed(2) : '--') + '</td>'
           + '<td class="' + cls + '">' + (pr != null ? (pr > 0 ? '+' : '') + Number(pr).toFixed(2) + '%' : '--') + '</td>'
           + '<td>' + (p.position_ratio != null ? Number(p.position_ratio).toFixed(1) + '%' : '--') + '</td></tr>';
       });
-      html += '</tbody></table>';
-    } else { html += '<div style="color:#9ca3af;padding:8px 0">暂无持仓数据</div>'; }
+      html += '</tbody></table></div>';
+    } else { html += '<div style="color:var(--text-secondary);padding:8px 0">暂无持仓数据</div>'; }
     html += '</div>';
 
-    // ── 调仓 ──
-    html += '<div class="card"><h2>📋 调仓记录 (' + (d.trades||[]).length + ')</h2>';
-    if (d.trades && d.trades.length) {
-      html += '<table><thead><tr><th>股票</th><th>日期</th><th>买入</th><th>卖出</th></tr></thead><tbody>';
-      d.trades.forEach(t => {
-        html += '<tr><td>' + esc(t.stock_name) + '</td><td>' + esc(t.trade_date) + '</td>'
-          + '<td>' + (t.buy_qty > 0 ? t.buy_qty : '--') + '</td>'
-          + '<td>' + (t.sell_qty > 0 ? t.sell_qty : '--') + '</td></tr>';
+    // ── Trades ──
+    const trades = d.trades || [];
+    html += '<div class="card"><div class="card-title">📋 调仓记录 (' + trades.length + ')</div>';
+    if (trades.length) {
+      html += '<div class="table-wrap"><table><thead><tr><th>股票</th><th>日期</th><th>方向</th></tr></thead><tbody>';
+      trades.forEach(t => {
+        const dir = t.buy_qty > 0 ? '买入' : t.sell_qty > 0 ? '卖出' : '--';
+        const dirCls = t.buy_qty > 0 ? 'c-positive' : t.sell_qty > 0 ? 'c-negative' : '';
+        const qty = t.buy_qty > 0 ? t.buy_qty : t.sell_qty > 0 ? t.sell_qty : '--';
+        html += '<tr><td><strong>' + esc(t.stock_name) + '</strong></td><td>' + esc(t.trade_date) + '</td>'
+          + '<td class="' + dirCls + '">' + dir + ' ' + qty + '</td></tr>';
       });
-      html += '</tbody></table>';
-    } else { html += '<div style="color:#9ca3af;padding:8px 0">暂无调仓记录</div>'; }
+      html += '</tbody></table></div>';
+    } else { html += '<div style="color:var(--text-secondary);padding:8px 0">暂无调仓记录</div>'; }
     html += '</div>';
 
     content.innerHTML = html;
-  } catch(e) { loading.textContent = '加载失败: ' + e.message; }
+
+    // ── Draw chart ──
+    if (tendency.length > 1) {
+      drawChart(tendency);
+    }
+  } catch(e) { loading.className = 'error'; loading.textContent = '❌ 加载失败: ' + e.message; }
+}
+
+function drawChart(data) {
+  const canvas = document.getElementById('trendChart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = (rect.width || 900) * dpr;
+  canvas.height = 260 * dpr;
+  canvas.style.width = (rect.width || 900) + 'px';
+  canvas.style.height = '260px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width || 900, H = 260;
+  const pad = { top: 20, right: 20, bottom: 30, left: 50 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  // Parse data
+  const points = data.map(d => ({
+    date: d.yk_date || '',
+    total: parseFloat(d.totalRate) || 0,
+    index: parseFloat(d.indexRate) || 0,
+  }));
+
+  // Find range
+  const allVals = points.flatMap(p => [p.total, p.index]);
+  const min = Math.min(...allVals, 0);
+  const max = Math.max(...allVals);
+  const range = max - min || 1;
+  const padding = range * 0.1;
+  const yMin = min - padding;
+  const yMax = max + padding;
+  const yRange = yMax - yMin || 1;
+
+  const xStep = cw / (points.length - 1 || 1);
+
+  function xPos(i) { return pad.left + i * xStep; }
+  function yPos(v) { return pad.top + ch - ((v - yMin) / yRange) * ch; }
+
+  // Grid lines
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  const gridCount = 5;
+  for (let i = 0; i <= gridCount; i++) {
+    const y = pad.top + (ch / gridCount) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const val = yMax - (yRange / gridCount) * i;
+    ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(1) + '%', pad.left - 6, y + 4);
+  }
+
+  // Draw total line
+  ctx.strokeStyle = '#1e3a8a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => { i === 0 ? ctx.moveTo(xPos(i), yPos(p.total)) : ctx.lineTo(xPos(i), yPos(p.total)); });
+  ctx.stroke();
+
+  // Draw index line
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  points.forEach((p, i) => { i === 0 ? ctx.moveTo(xPos(i), yPos(p.index)) : ctx.lineTo(xPos(i), yPos(p.index)); });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // X labels (show first, middle, last)
+  ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  const labelIndices = [0, Math.floor(points.length / 2), points.length - 1];
+  labelIndices.forEach(i => {
+    const dateStr = points[i].date || '';
+    const label = dateStr.length >= 8 ? dateStr.slice(2) : dateStr;
+    ctx.fillText(label, xPos(i), H - pad.bottom + 16);
+  });
 }
 
 function fmtPct(v) {
   if (v == null) return '--';
   const n = Number(v);
-  const cls = n > 0 ? 'positive' : n < 0 ? 'negative' : 'zero';
+  const cls = n > 0 ? 'c-positive' : n < 0 ? 'c-negative' : 'c-zero';
   const sign = n > 0 ? '+' : '';
   return '<span class="' + cls + '">' + sign + n.toFixed(2) + '%</span>';
 }

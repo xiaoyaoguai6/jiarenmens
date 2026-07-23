@@ -13,11 +13,19 @@ import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
 
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "portfolio.db"
+
+
+def _migrate_remarks(conn):
+    """为已有数据库的 positions 表添加 remarks 列（若不存在）"""
+    try:
+        conn.execute("ALTER TABLE positions ADD COLUMN remarks TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # 列已存在，忽略
 
 
 def _parse_float(val, default=0.0):
@@ -77,6 +85,7 @@ class PortfolioDB:
                     profit_ratio    TEXT,
                     position_date   TEXT,
                     snapshot_time   TEXT,
+                    remarks         TEXT DEFAULT '',
                     FOREIGN KEY (portfolio_id) REFERENCES portfolios(id)
                 )
             """)
@@ -137,6 +146,9 @@ class PortfolioDB:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_profit_pid ON profit_chart(portfolio_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_positions_date ON positions(position_date)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_time ON trades(trade_time)")
+
+            # 迁移：已有DB的 positions 表添加 remarks 列
+            _migrate_remarks(conn)
 
     @contextmanager
     def get_conn(self):
@@ -239,10 +251,6 @@ class PortfolioDB:
         for pos in positions:
             shares = self._parse_shares(pos)
             try:
-                gpmrcb = float(pos.get("gpmrcb", "0") or 0)
-            except (ValueError, TypeError):
-                gpmrcb = 0.0
-            try:
                 gpsz = float(pos.get("gpsz", "0") or 0)
             except (ValueError, TypeError):
                 gpsz = 0.0
@@ -250,7 +258,10 @@ class PortfolioDB:
                 fdyk = float(pos.get("fdyk", "0") or 0)
             except (ValueError, TypeError):
                 fdyk = 0.0
-            cost_price = round(gpmrcb / shares, 4) if shares > 0 else 0
+            # 成本价 = (市值 - 盈亏) / 数量
+            # 注意: gpmrcb 是历史累计买入总额(含已卖出部分), 不能直接用于计算成本价
+            cost_basis = gpsz - fdyk  # 当前持仓的真实成本总额
+            cost_price = round(cost_basis / shares, 4) if shares > 0 else 0
             curr_price = round(gpsz / shares, 4) if shares > 0 else 0
 
             conn.execute("""
@@ -267,7 +278,7 @@ class PortfolioDB:
                 shares,
                 cost_price,
                 curr_price,
-                gpmrcb,
+                cost_basis,        # 改用正确的成本总额, 而非 gpmrcb
                 gpsz,
                 fdyk,
                 pos.get("ykl", ""),
@@ -317,6 +328,20 @@ class PortfolioDB:
                 cjbh,
                 now,
             ))
+
+    def update_position_code(self, pos_id: int, stock_code: str, stock_name: str,
+                              remarks: Optional[List[Dict]] = None):
+        """更新单个持仓的股票代码、名称和备注。
+
+        当收盘价精确匹配唯一确定时，写入 stock_code 和 stock_name，清除 remarks。
+        当多只匹配时，传入 remarks 候选列表，留空 stock_code/stock_name。
+        """
+        remarks_json = json.dumps(remarks, ensure_ascii=False) if remarks else ""
+        with self.get_conn() as conn:
+            conn.execute(
+                "UPDATE positions SET stock_code=?, stock_name=?, remarks=? WHERE id=?",
+                (stock_code, stock_name, remarks_json, pos_id)
+            )
 
     def _save_identified(self, conn, pid: int, identified: List[Dict], now: str):
         # 每次全量覆盖该组合识别结果，避免旧识别残留污染

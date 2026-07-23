@@ -452,17 +452,13 @@ HTML_PAGE = r"""<!doctype html>
   async function refreshPortfolios() {
     const btn = document.getElementById("pf-refresh-btn");
     btn.disabled = true; btn.textContent = "刷新中…";
-    document.getElementById("pf-last-update").textContent = "正在抓取数据...";
+    document.getElementById("pf-last-update").textContent = "后台刷新中...";
     try {
       const res = await fetch(HOST + "/api/portfolio/refresh-all", {method: "POST"});
       const r = await res.json();
       if (!r.ok) throw new Error(r.error || "刷新失败");
-      document.getElementById("pf-last-update").textContent = "更新于 " + new Date().toLocaleTimeString();
-      loadPortfolios();
-      if (r.data) {
-        var pids = Object.keys(r.data);
-        if (pids.length > 0) alert("刷新完成: " + pids.length + " 个组合已更新");
-      }
+      document.getElementById("pf-last-update").textContent = "刷新任务已启动，请稍后刷新页面";
+      // 后台刷新完成后，用户手动刷新页面即可看到最新数据
     } catch (err) {
       alert("刷新失败: " + err.message);
       document.getElementById("pf-last-update").textContent = "刷新失败";
@@ -562,6 +558,11 @@ HTML_PAGE = r"""<!doctype html>
           const code = pos.stock_code || "";
           const name = pos.stock_name || "";
           const isMasked = code.includes("***") || code.includes("****");
+          // 检查 remarks 字段（JSON 数组或空字符串）
+          const remarks = pos.remarks || "";
+          let remarksList = [];
+          try { remarksList = JSON.parse(remarks); } catch(e) {}
+          const hasRemarksCandidates = Array.isArray(remarksList) && remarksList.length > 0;
 
           const idCode = pos.identified_code || "";
           const idName = pos.identified_name || "";
@@ -571,7 +572,14 @@ HTML_PAGE = r"""<!doctype html>
           // Display code/name: high confidence -> show real name, otherwise mask
           var displayCode, displayName, remark;
           var idScore = pos.identified_score || 0;
-          if (isMasked && isHighConf) {
+          if (hasRemarksCandidates) {
+            // 收盘价精确匹配发现多只候选，显示在备注列
+            displayCode = code.replace(/\*/g,'<span style="color:#d1d5db;">*</span>');
+            displayName = '<span style="color:#d1d5db;">' + escapeHtml(name) + '</span>';
+            remark = '<span style="color:#d97706;font-size:11px;">⚠️ 多只候选: ' +
+              remarksList.map(function(r) { return escapeHtml(r.code) + ' ' + escapeHtml(r.name); }).join(', ') +
+              '</span>';
+          } else if (isMasked && isHighConf) {
             displayCode = escapeHtml(idCode);
             displayName = escapeHtml(idName);
             remark = '<span style="color:#16a34a;font-size:11px;">\u2713 ' + idScore.toFixed(0) + '</span>';
@@ -779,21 +787,12 @@ def index():
 def api_players():
     with _conn() as c:
         rows = c.execute("""
-            SELECT p.zh_id, p.name, p.updated_at,
-                   (SELECT COUNT(*) FROM positions WHERE zh_id=p.zh_id
-                    GROUP BY zh_id
-                    HAVING crawl_date = MAX(crawl_date)) AS n_pos,
-                   (SELECT COUNT(*) FROM trades WHERE zh_id=p.zh_id
-                    GROUP BY zh_id
-                    HAVING crawl_date = MAX(crawl_date)) AS n_trades
+            SELECT p.zh_id, p.name, p.updated_at, p.total_return, p.daily_return
             FROM players p
-            WHERE p.zh_id IN (SELECT zh_id FROM positions UNION SELECT zh_id FROM trades)
-            GROUP BY p.zh_id
             ORDER BY p.updated_at DESC
         """).fetchall()
-        # 上面子查询过于复杂,可能 sqlite 行为与想象不一致,改成纯应用层补
         all_zh = [r["zh_id"] for r in rows]
-        counts = {}
+        counts = {"pos": {}, "trd": {}}
         if all_zh:
             ph = ",".join("?" * len(all_zh))
             pos = c.execute(f"SELECT zh_id, COUNT(*) n FROM positions GROUP BY zh_id HAVING zh_id IN ({ph})", all_zh).fetchall()
@@ -806,6 +805,8 @@ def api_players():
             "zh_id": r["zh_id"],
             "name": r["name"],
             "updated_at": str(r["updated_at"]) if r["updated_at"] else "",
+            "total_return": r["total_return"],
+            "daily_return": r["daily_return"],
             "n_pos": counts["pos"].get(r["zh_id"], 0),
             "n_trades": counts["trd"].get(r["zh_id"], 0),
         } for r in rows])
@@ -981,56 +982,47 @@ def api_portfolio_detail(pid):
 
 @app.route("/api/portfolio/refresh-all", methods=["POST"])
 def api_portfolio_refresh_all():
-    """一键刷新全部组合（持仓+识别+调仓+走势）"""
-    import subprocess, sys
-    try:
-        subprocess.check_call(
-            [sys.executable, str(PROJ_ROOT / "scripts" / "portfolio_monitor.py"),
-             "--identify"],
-            cwd=PROJ_ROOT, timeout=180,
-        )
-        db = PortfolioDB(PORTFOLIO_DB_PATH)
-        result = {}
-        for pid in [278, 413]:
-            p = db.get_portfolio(pid)
-            if p:
-                chart = db.get_history(pid, days=180)
-                result[pid] = {
-                    "portfolio": p,
-                    "positions": db.get_positions(pid),
-                    "trades": db.get_trades(pid, limit=10),
-                    "identified": db.get_identified(pid),
-                    "chart": chart,
-                }
-        return jsonify({"ok": True, "data": result})
-    except subprocess.TimeoutExpired:
-        return jsonify({"ok": False, "error": "刷新超时(>3分钟)"}), 504
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    """一键刷新全部组合（持仓+识别+调仓+走势）—— 后台异步执行"""
+    import subprocess, sys, threading
+
+    def _run_refresh():
+        try:
+            subprocess.check_call(
+                [sys.executable, str(PROJ_ROOT / "scripts" / "portfolio_monitor.py"),
+                 "--identify"],
+                cwd=PROJ_ROOT, timeout=300,
+            )
+            logger.info("Portfolio refresh completed successfully")
+        except subprocess.TimeoutExpired:
+            logger.error("Portfolio refresh timed out (>5min)")
+        except Exception as e:
+            logger.error(f"Portfolio refresh failed: {e}")
+
+    thread = threading.Thread(target=_run_refresh, daemon=True)
+    thread.start()
+    return jsonify({"ok": True, "message": "刷新任务已后台启动，请稍后刷新页面查看结果"})
 
 @app.route("/api/portfolio/<int:pid>/refresh", methods=["POST"])
 def api_portfolio_refresh(pid):
-    """手动触发指定组合的重新抓取"""
-    import subprocess
-    try:
-        subprocess.check_call(
-            [sys.executable, str(PROJ_ROOT / "scripts" / "portfolio_monitor.py"),
-             "--identify", "--portfolio", str(pid)],
-            cwd=PROJ_ROOT, timeout=120,
-        )
-        db = PortfolioDB(PORTFOLIO_DB_PATH)
-        chart = db.get_history(pid, days=180)
-        return jsonify({"ok": True, "data": {
-            "portfolio": db.get_portfolio(pid),
-            "positions": db.get_positions(pid),
-            "trades": db.get_trades(pid, limit=10),
-            "identified": db.get_identified(pid),
-            "chart": chart,
-        }})
-    except subprocess.TimeoutExpired:
-        return jsonify({"ok": False, "error": "刷新超时(>2分钟)"}), 504
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    """手动触发指定组合的重新抓取 —— 后台异步执行"""
+    import subprocess, threading
+
+    def _run_refresh(pid):
+        try:
+            subprocess.check_call(
+                [sys.executable, str(PROJ_ROOT / "scripts" / "portfolio_monitor.py"),
+                 "--identify", "--portfolio", str(pid)],
+                cwd=PROJ_ROOT, timeout=300,
+            )
+            logger.info(f"Portfolio #{pid} refresh completed")
+        except subprocess.TimeoutExpired:
+            logger.error(f"Portfolio #{pid} refresh timed out (>5min)")
+        except Exception as e:
+            logger.error(f"Portfolio #{pid} refresh failed: {e}")
+
+    thread = threading.Thread(target=_run_refresh, args=(pid,), daemon=True)
+    thread.start()
+    return jsonify({"ok": True, "message": f"组合 #{pid} 刷新任务已后台启动"})
 
 # ----- main -----
 def main():

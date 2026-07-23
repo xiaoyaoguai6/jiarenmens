@@ -715,9 +715,9 @@ _FOLLOW_HTML = r"""<!doctype html>
                    font-size: 14px; outline: none; }
   .add-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(30,58,138,.1); }
   .add-box button { padding: 8px 18px; border: none; border-radius: 8px;
-                    background: var(--primary); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
+                    background: #3b82f6; color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
   .add-box button:hover { background: #2563eb; }
-  .add-box button:disabled { opacity: .7; cursor: not-allowed; background: #93a3c7; }
+  .add-box button:disabled { opacity: .6; cursor: not-allowed; background: #93c5fd; }
   .add-msg { font-size: 13px; margin-bottom: 10px; padding: 6px 12px; border-radius: 6px; display: none; }
   .add-msg.success { display: block; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
   .add-msg.error { display: block; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }

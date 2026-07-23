@@ -1,15 +1,13 @@
 ﻿"""
 DongFangCaiFu ShiPan Player Crawler (API-only mode)
 
-Because the individual detail APIs (rt_get_info, rt_get_position, etc.)
-return -10000 server-side rejection and the info/detail HTML pages have
-had their data-loading JS gutted, we use only the rt_get_rank leaderboard
-API.  It returns per-player return rates across 5 time periods (total,
-250-day, 20-day, 5-day, daily), which is the richest data publicly
-accessible from the H5 endpoint.
+Pure API crawler using the rt_get_rank leaderboard endpoint.
+Returns per-player return rates across 5 time periods (total,
+250-day, 20-day, 5-day, daily).
 
-The old Playwright-based Step 2 (browser scraping for detail / positions /
-trades) is disabled because those pages render only an app-gate dialog.
+All individual detail APIs (rt_get_info, rt_get_position, etc.)
+return -10000 server-side rejection, so we enrich player profiles
+using rank data from all 5 time periods.
 """
 import json
 import sys

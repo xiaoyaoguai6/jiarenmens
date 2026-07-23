@@ -47,3 +47,7 @@ data/
 
 # Large APK / temp files
 tmp/
+
+# OpenCode / ECC config
+.omo/
+.opencode/

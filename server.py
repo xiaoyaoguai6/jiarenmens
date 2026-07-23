@@ -6,6 +6,7 @@ FastAPI 服务，暴露两个数据源：
   2. 大同证券投顾组合数据（portfolio.db）
 
 启动: uvicorn server:app --host 0.0.0.0 --port 8000
+文档: http://localhost:8000/docs
 """
 
 import json

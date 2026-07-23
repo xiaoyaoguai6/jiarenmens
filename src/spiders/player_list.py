@@ -1,10 +1,9 @@
 ﻿"""
 Player list spider using the rt_get_rank API.
 
-The rt_get_rank endpoint is the ONLY working API. All individual detail
-APIs (rt_get_info, rt_get_position, etc.) return -10000 server-side rejection,
-and the info/detail HTML pages have had their data-loading JS gutted.
-So we enrich player profiles using rank data from all 5 time periods.
+The rt_get_rank endpoint is the only working API — all individual detail
+APIs (rt_get_info, rt_get_position, etc.) return -10000 server-side rejection.
+Player profiles are enriched using rank data from all 5 time periods.
 """
 import requests
 from typing import List, Dict, Any

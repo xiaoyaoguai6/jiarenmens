@@ -22,6 +22,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
+# 非交易时段判断
+try:
+    from scripts.identify_by_close import is_market_closed
+except ImportError:
+    def is_market_closed() -> bool:
+        """兜底判断：周末也视为收盘"""
+        return datetime.now().weekday() >= 5
+
 # 本地缓存目录
 CACHE_DIR = Path(__file__).parent.parent / 'data'
 CACHE_DIR.mkdir(exist_ok=True)
@@ -118,7 +126,11 @@ def load_stock_codes() -> Dict:
         with open(STOCK_CODES_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     print("[WARN] Stock codes cache not found, building now...")
-    os.system(f'python "{CACHE_DIR / "build_stock_cache.py"}"')
+    build_script = Path(__file__).parent / "build_stock_cache.py"
+    if build_script.exists():
+        os.system(f'python "{build_script}"')
+    else:
+        print("[WARN] build_stock_cache.py not found, skipping")
     if STOCK_CODES_FILE.exists():
         with open(STOCK_CODES_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -131,73 +143,84 @@ def get_stocks_by_prefix(prefix: str) -> List[Dict]:
     return categories.get(prefix, [])
 
 def get_current_prices(codes: List[str]) -> Dict[str, float]:
-    """通过mootdx批量获取当前股价"""
+    """通过腾讯财经API批量获取当前股价(全球可用，不封IP)"""
     if not codes:
         return {}
     try:
-        from mootdx.quotes import Quotes
-        client = Quotes.factory(market='std')
-
-        # 分批查询，每批最多50个
-        batch_size = 50
+        import urllib.request
+        batch_size = 80
         all_prices = {}
 
         for i in range(0, len(codes), batch_size):
             batch = codes[i:i + batch_size]
             try:
-                result = client.quotes(symbol=batch)
-                if result is not None and len(result) > 0:
-                    for _, row in result.iterrows():
-                        code = str(row.get('code', ''))
-                        price = row.get('price', 0)
-                        vol = row.get('vol', 0)
-                        last_close = row.get('last_close', 0)
-                        open_price = row.get('open', 0)
-                        high = row.get('high', 0)
-                        low = row.get('low', 0)
-                        all_prices[code] = {
-                            'price': float(price),
-                            'open': float(open_price),
-                            'high': float(high),
-                            'low': float(low),
-                            'last_close': float(last_close),
-                            'vol': int(vol),
-                        }
+                prefixed = []
+                for c in batch:
+                    if c.startswith(("6", "5", "9")):
+                        prefixed.append(f"sh{c}")
+                    elif c.startswith("8"):
+                        prefixed.append(f"bj{c}")
+                    else:
+                        prefixed.append(f"sz{c}")
+
+                url = "https://qt.gtimg.cn/q=" + ",".join(prefixed)
+                req = urllib.request.Request(url)
+                req.add_header("User-Agent", "Mozilla/5.0")
+                resp = urllib.request.urlopen(req, timeout=10)
+                data = resp.read().decode("gbk")
+
+                for line in data.strip().split(";"):
+                    if not line.strip() or "=" not in line or '"' not in line:
+                        continue
+                    key = line.split("=")[0].split("_")[-1]
+                    vals = line.split('"')[1].split("~")
+                    if len(vals) < 40:
+                        continue
+                    code = key[2:] if len(key) > 2 else key
+                    price = float(vals[3]) if vals[3] else 0
+                    last_close = float(vals[4]) if vals[4] else 0
+                    open_px = float(vals[5]) if vals[5] else 0
+                    high = float(vals[33]) if vals[33] else 0
+                    low = float(vals[34]) if vals[34] else 0
+                    vol = float(vals[6]) if vals[6] else 0
+                    all_prices[code] = {
+                        'price': price,
+                        'open': open_px,
+                        'high': high,
+                        'low': low,
+                        'last_close': last_close,
+                        'vol': int(vol * 100),
+                    }
             except Exception as e:
-                print(f"  [WARN] batch query failed for {batch[0]}...: {e}")
-            time.sleep(0.3)  # 避免请求过快
+                print(f"  [WARN] Tencent batch query failed for {batch[0]}...: {e}")
+            time.sleep(0.2)
 
         return all_prices
-    except ImportError:
-        print("[WARN] mootdx not installed. Install with: pip install mootdx")
-        return {}
     except Exception as e:
-        print(f"[WARN] mootdx query failed: {e}")
+        print(f"[WARN] Tencent quote query failed: {e}")
         return {}
 
 def get_minute_kline(code: str, date: str) -> Optional[List]:
-    """获取分钟的K线数据"""
+    """获取分钟K线数据(通过腾讯财经API，全球可用)"""
     try:
-        from mootdx.quotes import Quotes
-        client = Quotes.factory(market='std')
-        # 判断市场: 0=深圳, 1=上海
-        if code.startswith('6') or code.startswith('5') or code.startswith('58'):
-            mk = 1
-        elif code.startswith('9'):
-            mk = 1  # 北交所
-        else:
-            mk = 0
-
-        result = client.minutes(symbol=code, date=date)
-        if result is not None and len(result) > 0:
-            data = []
-            for _, row in result.iterrows():
-                data.append({
-                    'price': float(row.get('price', 0)),
-                    'vol': int(row.get('vol', 0)),
-                    'volume': int(row.get('volume', 0)),
-                })
-            return data
+        prefix = "sh" if code.startswith(("6", "5", "9")) else ("bj" if code.startswith("8") else "sz")
+        url = f"http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={prefix}{code},day,,,5"
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        data = resp.json()
+        if data and "data" in data:
+            d = data["data"]
+            if prefix in d:
+                day_data = d[prefix].get("day", [])
+                if day_data:
+                    result = []
+                    for item in day_data:
+                        if len(item) >= 6:
+                            result.append({
+                                'price': float(item[2]),
+                                'vol': int(float(item[5]) * 100) if item[5] else 0,
+                                'volume': int(float(item[5]) * 100) if item[5] else 0,
+                            })
+                    return result if result else None
         return None
     except Exception as e:
         print(f"  [WARN] minute kline failed for {code}: {e}")
@@ -672,13 +695,15 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
         except (ValueError, TypeError):
             return 0
 
+    # ── 第一步：收集所有需要查询的代码，一次性批量查询 ──
+    all_need_codes = set()
+    pos_info = []  # (pos, prefix, shares, cur_val, cost_price)
     for pos in positions:
         code = pos.get("zqdm") or pos.get("stock_code") or ""
         prefix = code[:3]
         if not prefix or not prefix.isdigit():
             continue
 
-        # 总持股 = 可用 + 冻结
         kysl = _to_int(pos.get("kysl", 0))
         djsl = _to_int(pos.get("djsl", 0))
         gpsl = _to_int(pos.get("gpsl", 0))
@@ -686,7 +711,6 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
         if shares <= 0:
             continue
 
-        # Parse current value
         cur_val = 0.0
         for f in ["gpsz", "current_value"]:
             v = pos.get(f, 0)
@@ -699,9 +723,6 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
         if cur_val <= 0:
             continue
 
-        unit_price = cur_val / shares
-
-        # Parse cost amount
         cost_amount = 0.0
         for f in ["gpmrcb", "cost_amount"]:
             v = pos.get(f, 0)
@@ -713,31 +734,37 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
                 continue
         cost_price = cost_amount / shares if shares > 0 and cost_amount > 0 else 0
 
-        print(f"\n  [存量识别] {prefix}*** 单价≈{unit_price:.4f} 成本价≈{cost_price:.4f} 市值={cur_val:.0f} 数量={shares}")
-
-        # Get candidates
         candidates = get_stocks_by_prefix(prefix)
-        if not candidates:
-            print(f"    [WARN] 没有找到{prefix}***前缀的股票")
-            continue
+        for c in candidates:
+            all_need_codes.add(c["code"])
+        pos_info.append((pos, prefix, shares, cur_val, cost_price, candidates))
 
-        # Filter by price proximity
-        codes = [s["code"] for s in candidates]
-        prices = get_current_prices(codes)
-        if not prices:
-            continue
+    if not all_need_codes:
+        return []
+
+    # 批量查询所有候选股票行情
+    print(f"  [批量查询] 共 {len(all_need_codes)} 只候选股票...", flush=True)
+    t0 = time.time()
+    all_prices = get_current_prices(list(all_need_codes))
+    print(f"  [批量查询] 耗时 {time.time()-t0:.1f}s, 获取 {len(all_prices)} 只行情", flush=True)
+
+    # ── 第二步：用缓存的价格逐条匹配 ──
+    for pos, prefix, shares, cur_val, cost_price, candidates in pos_info:
+        unit_price = cur_val / shares
+
+        print(f"\n  [存量识别] {prefix}*** 单价≈{unit_price:.4f} 成本价≈{cost_price:.4f} 市值={cur_val:.0f} 数量={shares}")
 
         scored = []
         for s in candidates:
             sc = s["code"]
-            if sc not in prices:
+            if sc not in all_prices:
                 continue
-            pdata = prices[sc]
+            pdata = all_prices[sc]
             cur_px = pdata["price"]
             if cur_px <= 0:
                 continue
 
-            # Normalize ETF prices (mootdx qoutes return 10x for ETF/指数)
+            # Normalize ETF prices
             if cur_px > 5 and unit_price < 5 and cur_px / unit_price > 5:
                 norm = cur_px / 10.0
                 if abs(norm - unit_price) / unit_price < abs(cur_px - unit_price) / unit_price:
@@ -745,12 +772,12 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
 
             diff_pct = abs(cur_px - unit_price) / unit_price * 100
             if diff_pct > 20:
-                continue  # skip >20% deviation
+                continue
 
             score = 0.0
             details = []
 
-            # 因子1: 当前价吻合度 (0-60) —— 市值÷持股=真实单价，高度可信
+            # 因子1: 当前价吻合度 (0-60)
             if diff_pct <= 0.2:
                 score += 60; details.append("价格精确+60")
             elif diff_pct <= 0.5:
@@ -800,7 +827,7 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
                     elif qty_diff <= 0.05:
                         score += 4; details.append("数量近+4")
 
-            if score >= 20:  # Only keep if at least some match
+            if score >= 20:
                 scored.append({
                     "code": sc,
                     "name": s["name"],
@@ -814,7 +841,6 @@ def identify_existing_positions(portfolio_id: int, positions: List[Dict],
             scored.sort(key=lambda x: x["score"], reverse=True)
             best = None
             for cand in scored:
-                # 避免同一代码重复加入；同前缀不同持仓可匹配不同代码
                 if cand["code"] not in already_codes:
                     best = cand
                     break
@@ -1073,6 +1099,18 @@ def main():
             pdb.save_snapshot(info, positions or [], identified,
                               trades=deal_records, chart_data=chart_data)
             print(f"  [OK] 组合 #{pid} 已保存 (持仓{len(positions or [])} 识别{len(identified)})")
+
+            # 收盘价精确匹配：在非交易时段通过收盘价进一步确定股票代码
+            if is_market_closed():
+                print(f"\n  [收盘价匹配] 组合 #{pid} 当前是非交易时段，开始精确匹配...")
+                try:
+                    from scripts.identify_by_close import identify_portfolio_positions
+                    identify_portfolio_positions(pid, force=False)
+                except Exception as e:
+                    print(f"  [WARN] 收盘价匹配失败: {e}")
+            else:
+                print(f"\n  [INFO] 当前是盘中交易时段，收盘价未固定，跳过精确匹配")
+                print(f"         非交易时段（凌晨~9:15, 11:30~13:00, 15:00后）会自动运行")
 
     elif len(sys.argv) > 1 and sys.argv[1] == "--summary":
         sys.path.insert(0, str(Path(__file__).parent.parent))

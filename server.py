@@ -139,7 +139,7 @@ def unfollow_player(zh_id: str):
 
 @app.get("/api/follow")
 def list_followed():
-    """获取关注列表（含选手基本信息）"""
+    """获取关注列表（含选手基本信息，DB找不到时从rtV2补充）"""
     _init_follow_db()
     storage = get_crawl_storage()
     with sqlite3.connect(CRAWL_DB) as conn:
@@ -148,14 +148,25 @@ def list_followed():
     # enrich with player data
     for f in followed:
         p = storage.load_player(f["zh_id"])
-        if p:
+        if p and p.get("name"):
             f["name"] = p.get("name", "")
             f["followers"] = p.get("followers", 0)
             f["total_return"] = p.get("total_return", 0)
             f["daily_return"] = p.get("daily_return", 0)
         else:
-            f["name"] = ""
-            f["followers"] = 0
+            # DB无数据，从rtV2实时获取
+            try:
+                rtv2 = _fetch_rtv2(f["zh_id"])
+                det = rtv2.get("detail", {})
+                f["name"] = det.get("zuheName") or det.get("uidNick") or ""
+                f["followers"] = int(det.get("concernCnt", 0))
+                f["total_return"] = float(det.get("rate", 0))
+                f["daily_return"] = float(det.get("rateDay", 0))
+            except Exception:
+                f["name"] = ""
+                f["followers"] = 0
+                f["total_return"] = 0
+                f["daily_return"] = 0
     return {"total": len(followed), "data": followed}
 
 
@@ -742,16 +753,24 @@ async function addPlayer() {
   const zh = input.value.trim();
   if (!zh) { msg.className = 'add-msg error'; msg.textContent = '请输入组合ID'; return; }
   btn.disabled = true;
+  btn.textContent = '添加中...';
+  msg.className = 'add-msg';
+  msg.style.display = 'none';
   try {
     const r = await fetch('/api/follow/' + encodeURIComponent(zh), { method: 'POST' });
     if (!r.ok) { const e = await r.json(); throw new Error(e.detail || '添加失败'); }
     msg.className = 'add-msg success';
     msg.textContent = '✅ 添加成功！';
+    msg.style.display = 'block';
     input.value = '';
-    location.reload();
+    btn.textContent = '+ 添加';
+    btn.disabled = false;
+    load(); // 刷新列表
   } catch(e) {
     msg.className = 'add-msg error';
     msg.textContent = '❌ ' + e.message;
+    msg.style.display = 'block';
+    btn.textContent = '+ 添加';
     btn.disabled = false;
   }
 }

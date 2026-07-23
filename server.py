@@ -930,27 +930,31 @@ async function load() {
     });
     html += '</div></div>';
 
-    // ── Analysis Scores ──
+    // ── Analysis Scores (Hexagon Radar Chart) ──
     const dim = d.dimensions || {};
     const ev = d.evaluation || {};
-    const scores = [
-      { label: '综合评分', val: ev.score, color: ev.score >= 80 ? '#16a34a' : ev.score >= 50 ? '#d97706' : '#dc2626', unit: '分' },
-      { label: '收益能力', val: ev.profitRateScore, color: ev.profitRateScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
-      { label: '日胜率', val: ev.dayWinRateScore, color: ev.dayWinRateScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
-      { label: '风控水平', val: ev.maxDrawdownScore, color: ev.maxDrawdownScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
-      { label: '夏普比', val: ev.sharpeRatioScore, color: ev.sharpeRatioScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
-      { label: '分散度', val: ev.investmentDispersionScore, color: ev.investmentDispersionScore >= 80 ? '#16a34a' : '#d97706', unit: '分' },
+    const scoreItems = [
+      { label: '收益能力', key: 'profitRateScore' },
+      { label: '日胜率', key: 'dayWinRateScore' },
+      { label: '风控水平', key: 'maxDrawdownScore' },
+      { label: '夏普比', key: 'sharpeRatioScore' },
+      { label: '分散度', key: 'investmentDispersionScore' },
+      { label: '综合评分', key: 'score' },
     ];
-    if (scores.some(s => s.val != null)) {
-      html += '<div class="card"><div class="card-title">🎯 分析评分</div><div class="scores">';
-      scores.forEach(s => {
-        const v = s.val != null ? Number(s.val) : null;
-        html += '<div class="score-item"><div class="ring" style="background:' + (v != null ? s.color : '#94a3b8') + '">'
-          + (v != null ? Math.round(v) : '--') + '</div>'
-          + '<div class="label">' + s.label + '</div>'
-          + '<div class="sub-label">' + (dim.profitRate ? '收益 ' + dim.profitRate + '%' : '') + '</div></div>';
+    const hasScores = scoreItems.some(s => ev[s.key] != null);
+    if (hasScores) {
+      html += '<div class="card"><div class="card-title">🎯 分析评分（六维图）</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center">';
+      html += '<div style="flex:1;min-width:280px;max-width:400px"><canvas id="radarChart" style="width:100%;height:280px"></canvas></div>';
+      html += '<div style="flex:0 0 auto;font-size:13px;color:var(--text-secondary)">';
+      scoreItems.forEach(s => {
+        const v = ev[s.key] != null ? Math.round(Number(ev[s.key])) : null;
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:3px 0">'
+          + '<span style="width:10px;height:10px;border-radius:2px;background:var(--primary)"></span>'
+          + '<span>' + s.label + '</span>'
+          + '<span style="font-weight:600;color:var(--text)">' + (v != null ? v + '分' : '--') + '</span></div>';
       });
-      html += '</div></div>';
+      html += '</div></div></div>';
     }
 
     // ── Return Rate Trend Chart ──
@@ -1024,6 +1028,11 @@ async function load() {
     if (tendency.length > 1) {
       drawChart(tendency);
     }
+    // ── Draw radar ──
+    if (hasScores) {
+      // need to wait for DOM to render the canvas
+      setTimeout(() => drawRadarChart(ev), 50);
+    }
   } catch(e) { loading.className = 'error'; loading.textContent = '❌ 加载失败: ' + e.message; }
 }
 
@@ -1041,21 +1050,20 @@ function drawChart(data) {
   const pad = { top: 20, right: 20, bottom: 30, left: 50 };
   const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
 
-  // Parse data
-  const points = data.map(d => ({
+  // Parse data & sort by date ascending (oldest first, left to right)
+  let points = data.map(d => ({
     date: d.yk_date || '',
     total: parseFloat(d.totalRate) || 0,
     index: parseFloat(d.indexRate) || 0,
   }));
+  points.sort((a, b) => a.date.localeCompare(b.date));
 
-  // Find range
+  // Y-axis: start from 0 (or lower if data goes negative)
   const allVals = points.flatMap(p => [p.total, p.index]);
-  const min = Math.min(...allVals, 0);
-  const max = Math.max(...allVals);
-  const range = max - min || 1;
-  const padding = range * 0.1;
-  const yMin = min - padding;
-  const yMax = max + padding;
+  const dataMin = Math.min(...allVals, 0);
+  const dataMax = Math.max(...allVals);
+  const yMin = Math.min(0, dataMin);
+  const yMax = dataMax <= 0 ? 10 : Math.max(dataMax, dataMax * 0.05 + dataMax);
   const yRange = yMax - yMin || 1;
 
   const xStep = cw / (points.length - 1 || 1);
@@ -1073,6 +1081,16 @@ function drawChart(data) {
     const val = yMax - (yRange / gridCount) * i;
     ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
     ctx.fillText(val.toFixed(1) + '%', pad.left - 6, y + 4);
+  }
+
+  // Zero line
+  if (yMin < 0 && yMax > 0) {
+    const y0 = yPos(0);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, y0); ctx.lineTo(W - pad.right, y0); ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // Draw total line
@@ -1099,6 +1117,82 @@ function drawChart(data) {
     const label = dateStr.length >= 8 ? dateStr.slice(2) : dateStr;
     ctx.fillText(label, xPos(i), H - pad.bottom + 16);
   });
+}
+
+function drawRadarChart(ev) {
+  const canvas = document.getElementById('radarChart');
+  if (!canvas) return;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width || 320, h = 280;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const labels = ['收益能力', '日胜率', '风控水平', '夏普比', '分散度', '综合评分'];
+  const keys = ['profitRateScore', 'dayWinRateScore', 'maxDrawdownScore', 'sharpeRatioScore', 'investmentDispersionScore', 'score'];
+  const values = keys.map(k => ev[k] != null ? Math.min(Number(ev[k]), 100) / 100 : 0);
+
+  const cx = w * 0.42, cy = h * 0.5, r = Math.min(cx, cy) * 0.7;
+  const levels = 5;
+  const angleStep = (Math.PI * 2) / labels.length;
+  // rotate so first point is at top
+  const rot = -Math.PI / 2;
+
+  function getPoint(i, radius) {
+    return {
+      x: cx + radius * Math.cos(rot + angleStep * i),
+      y: cy + radius * Math.sin(rot + angleStep * i),
+    };
+  }
+
+  // Background grid
+  for (let lv = 1; lv <= levels; lv++) {
+    const radius = (r / levels) * lv;
+    ctx.beginPath();
+    for (let i = 0; i <= labels.length; i++) {
+      const p = getPoint(i % labels.length, radius);
+      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // Axis lines
+  for (let i = 0; i < labels.length; i++) {
+    const p = getPoint(i, r);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1; ctx.stroke();
+
+    // Labels
+    const lp = getPoint(i, r + 22);
+    ctx.fillStyle = '#475569'; ctx.font = '11px -apple-system, "PingFang SC", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(labels[i], lp.x, lp.y);
+  }
+
+  // Data polygon
+  ctx.beginPath();
+  for (let i = 0; i <= labels.length; i++) {
+    const idx = i % labels.length;
+    const radius = r * values[idx];
+    const p = getPoint(idx, radius);
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(30, 58, 138, 0.15)';
+  ctx.fill();
+  ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 2; ctx.stroke();
+
+  // Data points
+  for (let i = 0; i < labels.length; i++) {
+    const radius = r * values[i];
+    const p = getPoint(i, radius);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e3a8a'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  }
 }
 
 function fmtPct(v) {

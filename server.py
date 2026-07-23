@@ -204,7 +204,7 @@ _RANKINGS_HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>东方财富 · 选手榜单排名</title>
+<title>公开实盘排行榜</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -241,7 +241,7 @@ _RANKINGS_HTML = r"""<!doctype html>
 </head>
 <body>
 <div class="container">
-  <h1>📊 东方财富选手榜单排名</h1>
+  <h1>📊 公开实盘排行榜</h1>
   <div class="tabs" id="tabs"></div>
   <div class="info" id="info"></div>
   <div id="loading" class="loading">加载中...</div>
@@ -462,7 +462,7 @@ def root():
                 "GET /api/positions/distribution": "仓位分布统计",
                 "GET /api/positions/all": "全部选手持仓",
                 "GET /api/rankings/{rank_type}": "榜单排名数据（总榜/年榜/月榜/周榜/日榜）",
-                "GET /rankings": "榜单排名 HTML 页面",
+                "GET /rankings": "公开实盘排行榜 HTML 页面",
             },
             "大同证券投顾数据": {
                 "GET /api/portfolios": "投顾组合列表",

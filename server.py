@@ -162,6 +162,195 @@ def all_positions(crawl_date: Optional[str] = Query(None, description="日期"))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  榜单排名 (5种收益榜单)
+# ══════════════════════════════════════════════════════════════════════════════
+
+RANK_LABELS = {"总榜", "年榜", "月榜", "周榜", "日榜"}
+
+
+@app.get("/api/rankings/{rank_type}")
+def get_ranking(rank_type: str):
+    """获取指定榜单排名（总榜/年榜/月榜/周榜/日榜），按收益率降序排列"""
+    if rank_type not in RANK_LABELS:
+        raise HTTPException(400, detail=f"榜单类型必须是: {', '.join(sorted(RANK_LABELS))}")
+
+    storage = get_crawl_storage()
+    players = storage.load_players()
+
+    ranked = []
+    for p in players:
+        ranks = p.get("ranks", {})
+        if isinstance(ranks, list):
+            ranks = {}
+        entry = ranks.get(rank_type)
+        if entry and entry.get("return") is not None:
+            ranked.append({
+                "zh_id": p.get("zh_id"),
+                "name": p.get("name", ""),
+                "followers": p.get("followers", 0),
+                "return": entry["return"],
+            })
+
+    ranked.sort(key=lambda x: x["return"] or 0, reverse=True)
+    return {"rank_type": rank_type, "total": len(ranked), "data": ranked}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  榜单排名 HTML 页面
+# ══════════════════════════════════════════════════════════════════════════════
+
+_RANKINGS_HTML = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>东方财富 · 选手榜单排名</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f0f2f5; color: #1f2937; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 16px; color: #1e3a8a; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 8px 20px; border: 1px solid #d1d5db; border-radius: 6px;
+         background: #fff; cursor: pointer; font-size: 14px; color: #374151;
+         transition: all .15s; }
+  .tab:hover { background: #eff6ff; }
+  .tab.active { background: #1e3a8a; color: #fff; border-color: #1e3a8a; }
+  .info { font-size: 13px; color: #6b7280; margin-bottom: 10px; }
+  .pagination { display: flex; justify-content: center; align-items: center;
+                gap: 10px; margin: 16px 0; font-size: 14px; }
+  .pagination button { padding: 6px 14px; border: 1px solid #d1d5db;
+                       border-radius: 4px; background: #fff; cursor: pointer; }
+  .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+  .pagination button:hover:not(:disabled) { background: #eff6ff; }
+  table { width: 100%; border-collapse: collapse; background: #fff;
+          border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  th, td { padding: 10px 14px; text-align: left; font-size: 14px; }
+  th { background: #f8fafc; color: #475569; font-weight: 600;
+       border-bottom: 2px solid #e2e8f0; }
+  td { border-bottom: 1px solid #f1f5f9; }
+  tr:hover td { background: #f8fafc; }
+  .rank-num { font-weight: 600; color: #1e3a8a; width: 40px; }
+  .positive { color: #dc2626; }
+  .negative { color: #16a34a; }
+  .zero { color: #9ca3af; }
+  .fans { color: #6b7280; font-size: 13px; }
+  .loading { text-align: center; padding: 40px; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 东方财富选手榜单排名</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="info" id="info"></div>
+  <div id="loading" class="loading">加载中...</div>
+  <table id="table" style="display:none">
+    <thead><tr><th>#</th><th>组合名</th><th>选手名</th><th>粉丝数</th><th>收益率</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="pagination" id="pagination" style="display:none">
+    <button id="prevBtn" onclick="goPage(-1)">上一页</button>
+    <span id="pageInfo"></span>
+    <button id="nextBtn" onclick="goPage(1)">下一页</button>
+  </div>
+</div>
+<script>
+const RANK_TYPES = ['总榜', '年榜', '月榜', '周榜', '日榜'];
+const PAGE_SIZE = 20;
+let allData = {};
+let currentType = '总榜';
+let currentPage = 0;
+
+// render tabs
+const tabsEl = document.getElementById('tabs');
+RANK_TYPES.forEach(t => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (t === currentType ? ' active' : '');
+  btn.textContent = t;
+  btn.onclick = () => switchTab(t);
+  tabsEl.appendChild(btn);
+});
+
+function switchTab(type) {
+  currentType = type;
+  currentPage = 0;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.textContent === type));
+  render();
+}
+
+async function loadData() {
+  const loading = document.getElementById('loading');
+  const table = document.getElementById('table');
+  const pagination = document.getElementById('pagination');
+  try {
+    const res = await Promise.all(RANK_TYPES.map(t =>
+      fetch('/api/rankings/' + encodeURIComponent(t)).then(r => r.json())
+    ));
+    RANK_TYPES.forEach((t, i) => { allData[t] = res[i].data; });
+    loading.style.display = 'none';
+    table.style.display = '';
+    pagination.style.display = '';
+    render();
+  } catch (e) {
+    loading.textContent = '加载失败: ' + e.message;
+  }
+}
+
+function render() {
+  const data = allData[currentType] || [];
+  const total = data.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  if (currentPage >= totalPages) currentPage = totalPages - 1;
+  const start = currentPage * PAGE_SIZE;
+  const page = data.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('info').textContent = currentType + ' — 共 ' + total + ' 名选手';
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  page.forEach((p, i) => {
+    const rank = start + i + 1;
+    const r = p.return;
+    const cls = r > 0 ? 'positive' : r < 0 ? 'negative' : 'zero';
+    const sign = r > 0 ? '+' : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="rank-num">' + rank + '</td>'
+      + '<td>' + esc(p.name) + '</td>'
+      + '<td>' + esc(p.zh_id) + '</td>'
+      + '<td class="fans">' + p.followers.toLocaleString() + '</td>'
+      + '<td class="' + cls + '">' + sign + r.toFixed(2) + '%</td>';
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('pageInfo').textContent = '第 ' + (currentPage + 1) + '/' + totalPages + ' 页';
+  document.getElementById('prevBtn').disabled = currentPage <= 0;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages - 1;
+}
+
+function goPage(delta) {
+  const data = allData[currentType] || [];
+  const totalPages = Math.ceil(data.length / PAGE_SIZE) || 1;
+  const newPage = currentPage + delta;
+  if (newPage < 0 || newPage >= totalPages) return;
+  currentPage = newPage;
+  render();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+loadData();
+</script>
+</body>
+</html>"""
+
+
+@app.get("/rankings", response_class=HTMLResponse)
+def rankings_page():
+    return _RANKINGS_HTML
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  大同证券投顾数据 (portfolio.db)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -272,6 +461,8 @@ def root():
                 "GET /api/positions/top-holdings": "持仓最多的股票排行",
                 "GET /api/positions/distribution": "仓位分布统计",
                 "GET /api/positions/all": "全部选手持仓",
+                "GET /api/rankings/{rank_type}": "榜单排名数据（总榜/年榜/月榜/周榜/日榜）",
+                "GET /rankings": "榜单排名 HTML 页面",
             },
             "大同证券投顾数据": {
                 "GET /api/portfolios": "投顾组合列表",

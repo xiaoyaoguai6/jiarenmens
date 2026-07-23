@@ -179,6 +179,137 @@ def list_followed_ids():
     return {"ids": [r[0] for r in rows]}
 
 
+# ── Hot Stocks (实盘热股榜) ──────────────────────────────────────────────────
+
+_HOT_DB_INITED = False
+
+
+def _init_hot_db():
+    global _HOT_DB_INITED
+    if _HOT_DB_INITED:
+        return
+    with sqlite3.connect(CRAWL_DB) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hot_stocks_cache (
+                cache_type TEXT PRIMARY KEY,
+                data TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    _HOT_DB_INITED = True
+
+
+def _get_ranked_zh_ids(rank_type: str, top_n: int) -> list:
+    """从DB获取某榜单前N名选手的zh_id列表"""
+    storage = get_crawl_storage()
+    players = storage.load_players()
+    ranked = []
+    for p in players:
+        ranks = p.get("ranks", {})
+        if isinstance(ranks, list):
+            ranks = {}
+        entry = ranks.get(rank_type)
+        if entry and entry.get("return") is not None:
+            ranked.append((p.get("zh_id"), entry["return"]))
+    ranked.sort(key=lambda x: x[1] or 0, reverse=True)
+    return [z[0] for z in ranked[:top_n]]
+
+
+def _fetch_positions_safe(zh_id: str) -> list:
+    """安全调用rtV2获取持仓，失败返回空列表"""
+    try:
+        rtv2 = _fetch_rtv2(zh_id)
+        positions = rtv2.get("position", [])
+        return [
+            {
+                "stock_code": str(p.get("__code", "")),
+                "stock_name": p.get("__name", ""),
+            }
+            for p in (positions or [])
+            if p.get("__code")
+        ]
+    except Exception:
+        return []
+
+
+@app.post("/api/hot-stocks/refresh")
+def refresh_hot_stocks():
+    """刷新实盘热股榜（持仓榜+加仓榜），逐选手调用rtV2，间隔2秒"""
+    import time as _time
+    _init_hot_db()
+
+    # ── 持仓榜: 月榜+年榜 各前20 ──
+    hold_zh_ids = set()
+    for rt in ("月榜", "年榜"):
+        for z in _get_ranked_zh_ids(rt, 20):
+            hold_zh_ids.add(z)
+
+    # ── 加仓榜: 总榜+年榜+月榜+周榜 各前10 ──
+    add_zh_ids = set()
+    for rt in ("总榜", "年榜", "月榜", "周榜"):
+        for z in _get_ranked_zh_ids(rt, 10):
+            add_zh_ids.add(z)
+
+    total = len(hold_zh_ids) + len(add_zh_ids)
+    done = 0
+
+    def _agg(zh_ids: set) -> dict:
+        """聚合选手持仓，返回 {stock_code: {name, score}}"""
+        nonlocal done
+        result = {}
+        for zh in zh_ids:
+            positions = _fetch_positions_safe(zh)
+            for pos in positions:
+                code = pos["stock_code"]
+                if code in result:
+                    result[code]["score"] += 1
+                else:
+                    result[code] = {"stock_code": code, "stock_name": pos["stock_name"], "score": 1}
+            done += 1
+            if done < total:
+                _time.sleep(2)  # 间隔2秒，避免被拉黑
+        return result
+
+    hold_data = _agg(hold_zh_ids)
+    add_data = _agg(add_zh_ids)
+
+    # 排序
+    hold_sorted = sorted(hold_data.values(), key=lambda x: -x["score"])
+    add_sorted = sorted(add_data.values(), key=lambda x: -x["score"])
+
+    # 存DB
+    with sqlite3.connect(CRAWL_DB) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO hot_stocks_cache (cache_type, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            ("holdings", json.dumps(hold_sorted, ensure_ascii=False)),
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO hot_stocks_cache (cache_type, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            ("add", json.dumps(add_sorted, ensure_ascii=False)),
+        )
+
+    return {
+        "ok": True,
+        "holdings": {"count": len(hold_sorted), "players": len(hold_zh_ids)},
+        "add": {"count": len(add_sorted), "players": len(add_zh_ids)},
+    }
+
+
+@app.get("/api/hot-stocks")
+def get_hot_stocks():
+    """获取缓存的实盘热股榜数据"""
+    _init_hot_db()
+    with sqlite3.connect(CRAWL_DB) as conn:
+        rows = conn.execute("SELECT cache_type, data, updated_at FROM hot_stocks_cache").fetchall()
+    result = {}
+    for r in rows:
+        result[r[0]] = {
+            "data": json.loads(r[1]) if r[1] else [],
+            "updated_at": r[2],
+        }
+    return result
+
+
 # ── Player detail (rtV2 + ranking positions) ─────────────────────────────────
 
 EM_API = "https://emdcspzhapi.eastmoney.com/rtV2"
@@ -499,6 +630,7 @@ _RANKINGS_HTML = r"""<!doctype html>
   <div class="nav">
     <h1>📊 公开实盘排行榜</h1>
     <a href="/follow">❤️ 关注列表</a>
+    <a href="/hot-stocks">🔥 热股榜</a>
   </div>
   <div class="search-box">
     <input id="searchInput" placeholder="搜索选手名或组合ID..." onkeydown="if(event.key==='Enter') doSearch()">
@@ -1272,6 +1404,161 @@ def player_page(zh_id: str):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  实盘热股榜 HTML 页面
+# ══════════════════════════════════════════════════════════════════════════════
+
+_HOT_HTML = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实盘热股榜</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f0f2f5; color: #1f2937; padding: 20px; }
+  .container { max-width: 800px; margin: 0 auto; }
+  .nav { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .nav h1 { font-size: 22px; color: var(--primary,#1e3a8a); margin: 0; }
+  .nav a { text-decoration: none; color: var(--primary,#1e3a8a); font-size: 14px; padding: 6px 14px;
+           border: 1px solid var(--primary,#1e3a8a); border-radius: 6px; }
+  .nav a:hover { background: #eff6ff; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { padding: 8px 20px; border: 1px solid #d1d5db; border-radius: 6px;
+         background: #fff; cursor: pointer; font-size: 14px; color: #374151; }
+  .tab:hover { background: #eff6ff; }
+  .tab.active { background: #1e3a8a; color: #fff; border-color: #1e3a8a; }
+  .refresh-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .refresh-bar .info { font-size: 13px; color: #6b7280; }
+  .refresh-btn { padding: 8px 20px; border: none; border-radius: 8px;
+                 background: #3b82f6; color: #fff; font-size: 14px; cursor: pointer; }
+  .refresh-btn:hover { background: #2563eb; }
+  .refresh-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .progress { font-size: 13px; color: #d97706; margin-bottom: 10px; display: none; padding: 8px 14px;
+              background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a; }
+  table { width: 100%; border-collapse: collapse; background: #fff;
+          border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  th, td { padding: 10px 14px; text-align: left; font-size: 14px; }
+  th { background: #f8fafc; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+  td { border-bottom: 1px solid #f1f5f9; }
+  tr:hover td { background: #f8fafc; }
+  .rank-num { font-weight: 600; color: #1e3a8a; width: 36px; }
+  .score { font-weight: 600; color: #dc2626; }
+  .loading { text-align: center; padding: 40px; color: #6b7280; }
+  .empty-state { text-align: center; padding: 40px; color: #9ca3af; }
+  .stock-link { color: #1e3a8a; text-decoration: none; }
+  .stock-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <h1>🔥 实盘热股榜</h1>
+    <a href="/rankings">📊 排行榜</a>
+    <a href="/follow">❤️ 关注</a>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="refresh-bar">
+    <button class="refresh-btn" id="refreshBtn" onclick="doRefresh()">🔄 刷新数据</button>
+    <span class="info" id="updateInfo"></span>
+  </div>
+  <div class="progress" id="progress"></div>
+  <div id="loading" class="loading">加载中...</div>
+  <table id="table" style="display:none">
+    <thead><tr><th>#</th><th>股票名称</th><th>代码</th><th>关注人数</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div id="empty" class="empty-state" style="display:none">暂无数据，点击"刷新数据"获取</div>
+</div>
+<script>
+const TYPES = ['持仓榜', '加仓榜'];
+let currentType = '持仓榜';
+let cached = {};
+
+// tabs
+const tabsEl = document.getElementById('tabs');
+TYPES.forEach(t => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (t === currentType ? ' active' : '');
+  btn.textContent = t;
+  btn.onclick = () => { currentType = t; document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.textContent === t)); render(); };
+  tabsEl.appendChild(btn);
+});
+
+async function load() {
+  try {
+    const r = await fetch('/api/hot-stocks');
+    cached = await r.json();
+    document.getElementById('loading').style.display = 'none';
+    render();
+  } catch(e) {
+    document.getElementById('loading').textContent = '加载失败: ' + e.message;
+  }
+}
+
+function render() {
+  const key = currentType === '持仓榜' ? 'holdings' : 'add';
+  const entry = cached[key];
+  const table = document.getElementById('table');
+  const empty = document.getElementById('empty');
+  const updateInfo = document.getElementById('updateInfo');
+
+  if (!entry || !entry.data || !entry.data.length) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    updateInfo.textContent = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  table.style.display = '';
+  updateInfo.textContent = '上次更新: ' + (entry.updated_at || '--');
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  entry.data.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="rank-num">' + (i + 1) + '</td>'
+      + '<td><strong>' + esc(s.stock_name) + '</strong></td>'
+      + '<td>' + esc(s.stock_code) + '</td>'
+      + '<td class="score">' + s.score + ' 人</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  const progress = document.getElementById('progress');
+  btn.disabled = true;
+  progress.style.display = 'block';
+  progress.textContent = '⏳ 正在获取选手持仓数据，大约需要2-3分钟，请稍候...';
+
+  try {
+    const r = await fetch('/api/hot-stocks/refresh', { method: 'POST' });
+    const d = await r.json();
+    progress.textContent = '✅ 刷新完成！持仓榜: ' + d.holdings.count + ' 只股票(' + d.holdings.players + '人) | 加仓榜: ' + d.add.count + ' 只股票(' + d.add.players + '人)';
+    btn.disabled = false;
+    load(); // 重新加载显示
+  } catch(e) {
+    progress.textContent = '❌ 刷新失败: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>"""
+
+
+@app.get("/hot-stocks", response_class=HTMLResponse)
+def hot_stocks_page():
+    return _HOT_HTML
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  大同证券投顾数据 (portfolio.db)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1391,6 +1678,9 @@ def root():
                 "GET /rankings": "公开实盘排行榜 HTML 页面",
                 "GET /follow": "关注列表 HTML 页面",
                 "GET /player/{zh_id}": "选手详情 HTML 页面",
+                "GET /hot-stocks": "实盘热股榜 HTML 页面",
+                "GET /api/hot-stocks": "实盘热股榜缓存数据",
+                "POST /api/hot-stocks/refresh": "刷新实盘热股榜（逐个调rtV2，间隔2秒）",
             },
             "大同证券投顾数据": {
                 "GET /api/portfolios": "投顾组合列表",

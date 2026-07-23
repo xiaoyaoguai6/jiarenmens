@@ -357,6 +357,11 @@ INDEX_HTML = r"""<!doctype html>
   .sub-nav a { text-decoration:none; color:#1e3a8a; font-size:13px; padding:5px 12px; border:1px solid #1e3a8a; border-radius:6px; }
   .sub-nav a:hover { background:#eff6ff; }
   .sub-nav a.active { background:#1e3a8a; color:#fff; }
+  .bar { display:flex; gap:10px; align-items:center; font-size:12px; color:rgba(255,255,255,0.8); }
+  .bar button { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.2);
+                padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:500; }
+  .bar button:hover { background:rgba(255,255,255,0.25); }
+  .bar button:disabled { opacity:0.4; cursor:wait; }
   .add-box { display:flex; gap:8px; margin-bottom:14px; }
   .add-box input { flex:1; padding:8px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
   .add-box input:focus { border-color:#1e3a8a; box-shadow:0 0 0 2px rgba(30,58,138,.1); }
@@ -404,7 +409,8 @@ INDEX_HTML = r"""<!doctype html>
   .profit-badge.up { background: #fef2f2; color: #dc2626; }
   .profit-badge.down { background: #f0fdf4; color: #16a34a; }
   .profit-badge.flat { background: #f3f4f6; color: #6b7280; }
-  .pf-card .loading { padding: 30px; text-align: center; color: #9ca3af; font-size: 13px; }
+  .pf-card .loading { padding: 30px; text-align: center; color: #9ca3af; font-size: 13px; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
   .pf-empty { padding: 40px 20px; text-align: center; color: #c0c4cc; font-size: 13px; }
   .pf-empty strong { color: #9ca3af; }
 </style>
@@ -417,6 +423,13 @@ INDEX_HTML = r"""<!doctype html>
       <span class="nav-tab active" data-view="players" onclick="switchView('players')">实盘选手</span>
       <span class="nav-tab" data-view="portfolios" onclick="switchView('portfolios')">投顾组合</span>
     </div>
+  </div>
+  <div class="bar" id="header-bar-players">
+    <span id="last-update">—</span>
+  </div>
+  <div class="bar" id="header-bar-portfolios" style="display:none">
+    <span id="pf-last-update">—</span>
+    <button id="pf-refresh-btn" onclick="refreshPortfolios()">↻ 刷新数据</button>
   </div>
 </header>
 
@@ -502,6 +515,8 @@ let hotCached = {};
 function switchView(name) {
   document.querySelectorAll(".nav-tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + name));
+  document.getElementById("header-bar-players").style.display = name === "players" ? "flex" : "none";
+  document.getElementById("header-bar-portfolios").style.display = name === "portfolios" ? "flex" : "none";
   if (name === "portfolios") loadPortfolios();
 }
 
@@ -732,6 +747,27 @@ async function doHotRefresh() {
 }
 
 // ═══ Portfolios ═══
+async function refreshPortfolios() {
+  const btn = document.getElementById('pf-refresh-btn');
+  const info = document.getElementById('pf-last-update');
+  btn.disabled = true; btn.textContent = '⏳ 刷新中...';
+  info.textContent = '正在后台抓取数据，请稍候...';
+  try {
+    const r = await fetch('/api/portfolio/refresh-all', {method:'POST'});
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error||'刷新失败');
+    info.textContent = '刷新任务已启动，正在加载最新数据...';
+    // 等待几秒后重新加载
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    await loadPortfolios();
+    info.textContent = '更新于 ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    info.textContent = '刷新失败: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ 刷新数据';
+  }
+}
+
 async function loadPortfolios() {
   const grid = document.getElementById('pf-grid');
   grid.innerHTML = '<div class="pf-empty" style="grid-column:1/-1;"><strong>加载中...</strong></div>';

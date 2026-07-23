@@ -1,1 +1,0 @@
-"console.log('typeof-Java:', typeof Java); try { Java.perform(() => { console.log('Java.perform ok, WebView class:', typeof Java.use('android.webkit.WebView')); }); } catch(e) { console.log('java-err:', e); }"

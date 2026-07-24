@@ -756,11 +756,27 @@ async function refreshPortfolios() {
     const r = await fetch('/api/portfolio/refresh-all', {method:'POST'});
     const d = await r.json();
     if (!d.ok) throw new Error(d.error||'刷新失败');
-    info.textContent = '刷新任务已启动，正在加载最新数据...';
-    // 等待几秒后重新加载
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 轮询等待刷新完成
+    let waited = 0;
+    const maxWait = 120; // 最多等120秒
+    while (waited < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      waited += 3;
+      info.textContent = `刷新中... (${waited}s)`;
+      try {
+        const sr = await fetch('/api/portfolio/refresh-status');
+        const sd = await sr.json();
+        if (sd.status === 'done') {
+          info.textContent = sd.message + ' ✅';
+          break;
+        }
+        info.textContent = sd.message || '刷新中...';
+      } catch(e) {
+        // 状态查询失败，继续等
+      }
+    }
     await loadPortfolios();
-    info.textContent = '更新于 ' + new Date().toLocaleTimeString();
+    info.textContent = info.textContent || ('更新于 ' + new Date().toLocaleTimeString());
   } catch(e) {
     info.textContent = '刷新失败: ' + e.message;
   } finally {
@@ -1071,8 +1087,91 @@ def api_trades():
         return jsonify([dict(r) for r in rows])
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  投顾组合 API（保持不变）
-# ══════════════════════════════════════════════════════════════════════════════
+# ── 刷新状态跟踪 ──
+_refresh_status = {"status": "idle", "started_at": None, "message": ""}
+_refresh_lock = threading.Lock()
+
+@app.route("/api/portfolio/refresh-status")
+def api_portfolio_refresh_status():
+    """轮询刷新任务状态"""
+    with _refresh_lock:
+        return jsonify(_refresh_status)
+
+@app.route("/api/portfolio/refresh-all", methods=["POST"])
+def api_portfolio_refresh_all():
+    """刷新投顾组合数据：先快速拉取API数据→保存DB，再后台慢慢做股票识别"""
+    import subprocess, threading
+    from datetime import datetime as dt
+
+    # 标记刷新开始
+    with _refresh_lock:
+        _refresh_status["status"] = "running"
+        _refresh_status["started_at"] = dt.now().isoformat()
+        _refresh_status["message"] = "正在拉取API数据..."
+
+    def _quick_refresh():
+        """快速拉取API数据（持仓、调仓、走势），不做股票识别"""
+        try:
+            # 动态导入，避免循环依赖
+            sys.path.insert(0, str(PROJ_ROOT))
+            sys.path.insert(0, str(PROJ_ROOT / "scripts"))
+            from portfolio_monitor import (
+                analyze_positions, fetch_position_list,
+                fetch_deal_records, fetch_profit_chart, save_to_db,
+                PORTFOLIOS
+            )
+
+            pids = list(PORTFOLIOS.keys())
+            for pid in pids:
+                with _refresh_lock:
+                    _refresh_status["message"] = f"正在拉取组合 #{pid} 数据..."
+                info = analyze_positions(pid)
+                if "error" in info:
+                    continue
+                positions = fetch_position_list(pid)
+                trades = fetch_deal_records(pid)
+                chart = fetch_profit_chart(pid)
+                # 快速保存基础数据（不含识别结果）
+                save_to_db(info, positions or [])
+
+                # 如果有调仓/走势数据，也保存
+                if trades or chart:
+                    from src.storage.portfolio_db import PortfolioDB
+                    pdb = PortfolioDB(PORTFOLIO_DB_PATH)
+                    pdb.save_snapshot(info, positions or [], [],
+                                      trades=trades, chart_data=chart)
+
+            with _refresh_lock:
+                _refresh_status["message"] = "基础数据已更新，正在后台识别股票..."
+                _refresh_status["status"] = "identifying"
+
+            # 第二步：后台启动完整股票识别（慢）
+            def _run_identify():
+                try:
+                    subprocess.check_call(
+                        [sys.executable, str(PROJ_ROOT / "scripts" / "portfolio_monitor.py"), "--identify"],
+                        cwd=PROJ_ROOT, timeout=300
+                    )
+                    with _refresh_lock:
+                        _refresh_status["status"] = "done"
+                        _refresh_status["message"] = "刷新完成（含股票识别）"
+                except subprocess.TimeoutExpired:
+                    with _refresh_lock:
+                        _refresh_status["status"] = "done"
+                        _refresh_status["message"] = "刷新完成（股票识别超时，基础数据已就绪）"
+                except Exception as e:
+                    with _refresh_lock:
+                        _refresh_status["status"] = "done"
+                        _refresh_status["message"] = f"刷新完成（识别异常: {e}，基础数据可用）"
+            threading.Thread(target=_run_identify, daemon=True).start()
+
+        except Exception as e:
+            with _refresh_lock:
+                _refresh_status["status"] = "done"
+                _refresh_status["message"] = f"刷新异常: {e}"
+
+    threading.Thread(target=_quick_refresh, daemon=True).start()
+    return jsonify({"ok": True, "message": "刷新任务已启动"})
 
 @app.route("/api/portfolio/summary")
 def api_portfolio_summary():
@@ -1101,15 +1200,6 @@ def api_portfolio_detail(pid):
             pos["identified_confidence"] = best.get("confidence","low"); pos["identified_score"] = best.get("score",0)
     chart = db.get_history(pid, days=180)
     return jsonify({"portfolio":portfolio,"positions":positions,"trades":db.get_trades(pid,limit=10),"identified":identified,"chart":chart})
-
-@app.route("/api/portfolio/refresh-all", methods=["POST"])
-def api_portfolio_refresh_all():
-    import subprocess, threading
-    def _run():
-        try: subprocess.check_call([sys.executable,str(PROJ_ROOT/"scripts"/"portfolio_monitor.py"),"--identify"],cwd=PROJ_ROOT,timeout=300)
-        except: pass
-    threading.Thread(target=_run,daemon=True).start()
-    return jsonify({"ok":True,"message":"刷新任务已后台启动"})
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Main

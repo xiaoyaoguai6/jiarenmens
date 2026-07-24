@@ -183,32 +183,27 @@ def detect_changes(zh_id: str, name: str, current_positions: list, current_trade
         return None
 
     # 构建通知
-    lines = [f"📢 选手调仓提醒", "", f"选手: {name} ({zh_id})", ""]
+    lines = [f"📢 选手调仓提醒", f"", f"选手: {name} ({zh_id})", ""]
 
     for t in new_trades:
         stock_name = t.get("stock_name", "")
         stock_code = str(t.get("stock_code", ""))
-        buy_qty = t.get("buy_qty", 0)
-        sell_qty = t.get("sell_qty", 0)
-        direction = "买入" if buy_qty else "卖出"
-        qty = buy_qty or sell_qty
+        buy_qty = t.get("buy_qty", "0")
+        sell_qty = t.get("sell_qty", "0")
 
-        lines.append(f"🔄 {direction} {stock_name}({stock_code})")
-        lines.append(f"  {direction} {qty} 手")
+        # 判断方向
+        if buy_qty not in ("0", "0.0", 0, "0.00", "", "--"):
+            direction = "买入"
+            qty = buy_qty
+            pos = t.get("buy_position", "--")
+            price = t.get("buy_price", "--")
+        else:
+            direction = "卖出"
+            qty = sell_qty
+            pos = t.get("sell_position", "--")
+            price = t.get("sell_price", "--")
 
-        # 查找旧持仓中该股票的仓位
-        old_pos = next((p for p in old_positions if str(p.get("stock_code", "")) == stock_code), None)
-        new_pos = next((p for p in current_positions if str(p.get("stock_code", "")) == stock_code), None)
-        old_ratio = float(old_pos.get("position_ratio", 0)) if old_pos else 0
-        new_ratio = float(new_pos.get("position_ratio", 0)) if new_pos else 0
-        lines.append(f"  仓位: {old_ratio:.0f}% → {new_ratio:.0f}%")
-
-        if new_pos:
-            cost = new_pos.get("cost_price", "")
-            price = new_pos.get("current_price", "")
-            profit = new_pos.get("profit_ratio", "")
-            lines.append(f"  成本价 {cost} | 现价 {price} | 盈亏 {profit}%")
-        lines.append("")
+        lines.append(f"{stock_name} {stock_code} {direction} 笔数 {qty}笔， 交易仓位 {pos} 均价 {price}")
 
     # 当前全部持仓
     lines.append("📦 当前持仓:")
@@ -256,12 +251,19 @@ def poll_once():
 
         trades = []
         for t in (data.get("tradeSummary") or []):
+            # 从 stkMktCode 提取纯数字代码: "SZ001309" → "001309"
+            raw_code = str(t.get("stkMktCode", ""))
+            code = raw_code[2:] if len(raw_code) > 2 else raw_code
             trades.append({
-                "stock_code": str(t.get("fullcode", "")) or str(t.get("stkMktCode", "")),
+                "stock_code": code,
                 "stock_name": t.get("stkName", ""),
                 "trade_date": t.get("tzrq", ""),
-                "buy_qty": t.get("lshj_mr", 0),
-                "sell_qty": t.get("lshj_mc", 0),
+                "buy_qty": t.get("lshj_mr", "0"),
+                "buy_position": t.get("cwhj_mr", "--"),
+                "buy_price": t.get("cjjg_mr", "--"),
+                "sell_qty": t.get("lshj_mc", "0"),
+                "sell_position": t.get("cwhj_mc", "--"),
+                "sell_price": t.get("cjjg_mc", "--"),
             })
 
         # 检测变动

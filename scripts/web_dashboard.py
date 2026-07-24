@@ -808,16 +808,20 @@ async function loadPortfolios() {
 function buildPfCard(p) {
   const tr = (p.total_return||0); const rc = tr>=0?'pos-up':'pos-down'; const rs = (tr*100).toFixed(2)+'%';
   const assets = (p.total_assets||0).toLocaleString('zh-CN',{minimumFractionDigits:2});
-  return '<div class="pf-head"><div class="info"><h2>#' + p.id + ' ' + esc(p.name||'—') + '</h2><div class="advisor">👤 ' + esc(p.advisor||'—') + '</div></div><div class="meta"><div class="assets">¥' + assets + '</div><div class="assets-label">总资产</div><div class="return ' + rc + '">总收益 ' + rs + '</div></div></div><div class="pf-stats"><div class="pf-stat"><div class="num" id="pf-pos-' + p.id + '">—</div><div class="label">持仓</div></div><div class="pf-stat"><div class="num" id="pf-trd-' + p.id + '">—</div><div class="label">调仓</div></div><div class="pf-stat"><div class="num" id="pf-idf-' + p.id + '">—</div><div class="label">已识别</div></div></div><div id="pf-det-' + p.id + '"><div class="loading">加载明细</div></div>';
+  const dp = p.daily_profit||0;
+  const dpc = dp>=0?'pos-up':'pos-down';
+  const dps = dp>=0?'+'+dp.toLocaleString('zh-CN',{minimumFractionDigits:2}):dp.toLocaleString('zh-CN',{minimumFractionDigits:2});
+  const baseAssets = (p.total_assets||0) - dp;
+  const dr = baseAssets > 0 ? (dp / baseAssets * 100) : 0;
+  const drc = dr>=0?'pos-up':'pos-down';
+  const drs = (dr>=0?'+':'')+dr.toFixed(2)+'%';
+  return '<div class="pf-head"><div class="info"><h2>#' + p.id + ' ' + esc(p.name||'—') + '</h2><div class="advisor">👤 ' + esc(p.advisor||'—') + '</div></div><div class="meta"><div class="assets">¥' + assets + '</div><div class="assets-label">总资产</div><div class="return ' + rc + '">总收益 ' + rs + '</div></div></div><div class="pf-stats"><div class="pf-stat"><div class="num ' + drc + '">' + drs + '</div><div class="label">今日收益率</div></div><div class="pf-stat"><div class="num ' + dpc + '">¥' + dps + '</div><div class="label">今日盈亏</div></div></div><div id="pf-det-' + p.id + '"><div class="loading">加载明细</div></div>';
 }
 
 async function loadPfDetail(pid, cardEl) {
   try {
     const res = await fetch('/api/portfolio/' + pid); const data = await res.json();
     if (!data.portfolio) { document.getElementById('pf-det-'+pid).innerHTML = '<div class="pf-empty">无数据</div>'; return; }
-    document.getElementById('pf-pos-'+pid).textContent = (data.positions||[]).length;
-    document.getElementById('pf-trd-'+pid).textContent = (data.trades||[]).length;
-    document.getElementById('pf-idf-'+pid).textContent = (data.identified||[]).length;
     let html = '<div class="pf-section"><h4>持仓明细 <span class="badge">' + (data.positions||[]).length + ' 只</span></h4>';
     if (data.positions && data.positions.length) {
       html += '<table class="pf-table"><thead><tr><th>代码</th><th>名称</th><th>数量</th><th>现价</th><th>成本价</th><th>市值</th><th>盈亏</th><th>盈亏比</th><th>仓位%</th></tr></thead><tbody>';
@@ -1116,27 +1120,32 @@ def api_portfolio_refresh_all():
             sys.path.insert(0, str(PROJ_ROOT))
             sys.path.insert(0, str(PROJ_ROOT / "scripts"))
             from portfolio_monitor import (
-                analyze_positions, fetch_position_list,
+                analyze_positions, fetch_portfolio_info,
+                fetch_position_list,
                 fetch_deal_records, fetch_profit_chart, save_to_db,
                 PORTFOLIOS
             )
+            from src.storage.portfolio_db import PortfolioDB
 
             pids = list(PORTFOLIOS.keys())
             for pid in pids:
                 with _refresh_lock:
                     _refresh_status["message"] = f"正在拉取组合 #{pid} 数据..."
-                info = analyze_positions(pid)
-                if "error" in info:
-                    continue
+                # 用原始API数据（含zczk.zfdyk=今日盈亏, syl0=今日收益率）
+                raw_info = fetch_portfolio_info(pid)
+                if not raw_info:
+                    # fallback: 用analyze_positions
+                    info = analyze_positions(pid)
+                    if "error" in info:
+                        continue
+                else:
+                    info = raw_info
                 positions = fetch_position_list(pid)
                 trades = fetch_deal_records(pid)
                 chart = fetch_profit_chart(pid)
-                # 快速保存基础数据（不含识别结果）
+                # 保存完整数据到DB（含zfdyk/syl0等）
                 save_to_db(info, positions or [])
-
-                # 如果有调仓/走势数据，也保存
                 if trades or chart:
-                    from src.storage.portfolio_db import PortfolioDB
                     pdb = PortfolioDB(PORTFOLIO_DB_PATH)
                     pdb.save_snapshot(info, positions or [], [],
                                       trades=trades, chart_data=chart)

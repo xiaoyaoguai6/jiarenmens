@@ -183,7 +183,7 @@ def detect_changes(zh_id: str, name: str, current_positions: list, current_trade
         return None
 
     # 构建通知
-    lines = [f"📢 选手调仓提醒", f"", f"选手: {name} ({zh_id})", ""]
+    lines = [f"━━━ 选手调仓提醒 ━━━", f"", f"👤 {name}（{zh_id}）", ""]
 
     for t in new_trades:
         stock_name = t.get("stock_name", "")
@@ -203,14 +203,14 @@ def detect_changes(zh_id: str, name: str, current_positions: list, current_trade
             pos = t.get("sell_position", "--")
             price = t.get("sell_price", "--")
 
-        lines.append(f"{stock_name} {stock_code} {direction} 笔数 {qty}笔， 交易仓位 {pos} 均价 {price}")
+        lines.append(f"{'🟢 买入' if direction == '买入' else '🔴 卖出'}  {stock_name}({stock_code})  {qty}笔  仓位{pos}  均价{price}")
 
     # 当前全部持仓
     lines.append("📦 当前持仓:")
     for i, p in enumerate(current_positions, 1):
-        lines.append(f"  {i}. {p.get('stock_name','')}({p.get('stock_code','')}) "
-                     f"成本{p.get('cost_price','')} 现价{p.get('current_price','')} "
-                     f"盈亏{p.get('profit_ratio','')}% 仓位{p.get('position_ratio','')}%")
+        lines.append(f"  {i}. {p.get('stock_name','')}（{p.get('stock_code','')}）"
+                         f" 成本{p.get('cost_price','')}  现价{p.get('current_price','')}"
+                         f"  {'📈' if float(p.get('profit_ratio',0) or 0)>=0 else '📉'}{p.get('profit_ratio','')}%  仓位{p.get('position_ratio','')}%")
 
     return "\n".join(lines)
 
